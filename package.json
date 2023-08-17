@@ -1,0 +1,48 @@
+{
+  "name": "@cmdcode/core-orm",
+  "version": "0.0.2",
+  "description": "Command Bitcoin Core via an ORM suite of automation tools.",
+  "author": "Christopher Scott",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cmdruid/core-orm.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "files": [
+    "README.md",
+    "LICENSE",
+    "bin",
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist/* coverage .nyc_output",
+    "release": "yarn clean && yarn build",
+    "scratch": "tsx test/scratch.ts"
+  },
+  "dependencies": {
+    "@cmdcode/buff-utils": "^1.11.10",
+    "@cmdcode/crypto-utils": "^2.3.9",
+    "@scrow/tapscript": "^2.0.2",
+    "@types/node": "^18.13.0"
+  },
+  "devDependencies": {
+    "tslib": "^2.6.1",
+    "tsx": "^3.12.7",
+    "typescript": "^5.1.6"
+  }
+}
