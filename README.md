@@ -1,6 +1,6 @@
-# Core ORM
+# Core Command
 
-An ORM for Bitcoin Core
+Take command of Bitcoin Core using a suite of automation tools.
 
 Example code:
 

@@ -74,9 +74,9 @@ export function spawn_process (
     })
     proc.on('close', code => {
       if (code !== 0) {
-        throw new Error(`Core exited with failure code: ${String(code)}`)
+        throw new Error(`Exited with failure code: ${String(code)}`)
       }
-      console.log('Core exited successfully with code 0.')
+      console.log('Exited successfully with code 0.')
     })
   })
 }

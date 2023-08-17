@@ -7,9 +7,10 @@ export type CLIConfig = CoreConfig
 export type MethodArgs = string | string[] | Record<string, any>
 
 export interface CoreConfig {
-  cmdpath   : string
-  confpath ?: string
-  datapath  : string
-  network   : string
-  params    : string[]
+  corepath : string
+  clipath  : string
+  confpath : string
+  datapath : string
+  network  : string
+  params   : string[]
 }

@@ -1,12 +1,12 @@
 {
-  "name": "@cmdcode/core-orm",
+  "name": "@cmdcode/core-cmd",
   "version": "0.0.10",
-  "description": "Command Bitcoin Core via an ORM suite of automation tools.",
+  "description": "Command Bitcoin Core using a suite of automation tools.",
   "author": "Christopher Scott",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cmdruid/core-orm.git"
+    "url": "https://github.com/cmdruid/core-cmd.git"
   },
   "publishConfig": {
     "registry": "https://registry.npmjs.org",

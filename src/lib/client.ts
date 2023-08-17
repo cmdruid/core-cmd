@@ -1,4 +1,5 @@
 import { parse_args, run_cmd } from './cmd.js'
+import { DEFAULT_CONFIG }      from '../config.js'
 
 import {
   CLIConfig,
@@ -9,29 +10,27 @@ import {
 } from '../types/index.js'
 
 import { CoreWallet } from './wallet.js'
-import { ROOT_PATH }  from '../config.js'
 
-const DEFAULT_CONFIG = {
-  cmdpath  : `${ROOT_PATH}/bin/bitcoin-cli`,
-  datapath : `${process.cwd()}/coredata`,
-  network  : 'regtest',
-  params   : []
-}
+import { ensure_file_exists } from './util.js'
 
 export class CoreClient {
-  cmdpath : string
+  clipath : string
   network : string
   params  : string[]
 
   constructor (config : Partial<CLIConfig> = {}) {
     const opt = { ...DEFAULT_CONFIG, ...config }
-    this.cmdpath = opt.cmdpath
+    this.clipath = opt.clipath
     this.network = opt.network
     this.params  = [
       `-rpccookiefile=${opt.datapath}/${opt.network}/.cookie`,
       `-chain=${this.network}`,
       ...opt.params
     ]
+    if (opt.confpath !== undefined) {
+      ensure_file_exists(opt.confpath)
+      this.params.push(`-conf=${opt.confpath}`)
+    }
   }
 
   get get_info () {
@@ -53,7 +52,7 @@ export class CoreClient {
   ) : Promise<T> {
     const p = [ ...this.params, ...params ]
     p.push(...parse_args(method, args))
-    return run_cmd(this.cmdpath, p)
+    return run_cmd(this.clipath, p)
   }
 
   async get_wallet (name : string) {

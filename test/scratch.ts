@@ -9,6 +9,8 @@ core.on('ready', async (client) => {
 
   console.log(info)
 
+  throw 'kaboom'
+
   const wallet = await client.get_wallet('test_wallet')
 
   const addr   = await wallet.newaddress
