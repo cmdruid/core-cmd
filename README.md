@@ -18,7 +18,7 @@ Configuring a core daemon instance.
 ```ts
 import { CoreDaemon } from '@cmdcode/core-cmd'
 
-export interface CoreConfig {
+const config : {
   corepath   : string    // Path to your bitcoind binary (if not available in PATH).
   cookiepath : string    // Path to your cookie file (if different than datapath).
   clipath    : string    // Path to your bitcoin-cli (if not available in PATH).
@@ -26,15 +26,11 @@ export interface CoreConfig {
   datapath   : string    // Path to your bitcoin data directory.
   network    : string    // Network to use (default is regetest).
   params     : string[]  // Additional params to use when starting bitcoind.
-}
+} = {}
 
 // To start, create a new CoreDaemon object (with optional config).
 const core = new CoreDaemon(config)
-```
 
-Running a script.
-
-```ts
 // Once core is initialized, it will emit a 'ready' event with a client.
 core.on('ready', async (client) => {
   // You can use the client to run commands.
