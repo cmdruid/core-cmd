@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process'
+import { exec, spawn, ChildProcess } from 'child_process'
 
 import { MethodArgs } from '../types/index.js'
 
@@ -77,6 +77,18 @@ export function spawn_process (
         throw new Error(`Exited with failure code: ${String(code)}`)
       }
       console.log('Exited successfully with code 0.')
+    })
+  })
+}
+
+export function check_process (name : string) {
+  const unix = `ps aux | grep ${name} | grep -v grep`
+  const wind = `tasklist | grep ${name}`
+  const cmd  = process.platform === 'win32' ? wind : unix
+  return new Promise((resolve) => {
+    exec(cmd, (_err, out) => {
+      if (out) resolve(true)
+      resolve(false)
     })
   })
 }

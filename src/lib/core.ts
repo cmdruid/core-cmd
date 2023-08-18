@@ -1,6 +1,6 @@
 import EventEmitter       from 'events'
 import { ChildProcess }   from 'child_process'
-import { spawn_process }  from './cmd.js'
+import { check_process, spawn_process }  from './cmd.js'
 import { CoreClient }     from './client.js'
 import { DEFAULT_CONFIG } from '../config.js'
 
@@ -66,15 +66,21 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async startup (params : string[] = []) {
-    const p = [ ...this.params, ...params ]
-    const msg  = 'loadblk thread exit'
-    await ensure_path_exists(this.datapath)
-    console.log('Starting bitcoin core daemon with params:')
-    console.log('exec:', this.corepath)
-    console.log('data:', this.datapath)
-    console.log(p)
-    const proc = await spawn_process(this.corepath, p, msg)
-    this._proc = proc
+    if (await check_process('bitcoin-qt')) {
+      console.log('Using existing Bitcoin QT instance...')
+    } else if (await check_process('bitcoind')) {
+      console.log('Using existing Bitcoin daemon...')
+    } else {
+      const p = [ ...this.params, ...params ]
+      const msg  = 'loadblk thread exit'
+      await ensure_path_exists(this.datapath)
+      console.log('Starting bitcoin core daemon with params:')
+      console.log('exec:', this.corepath)
+      console.log('data:', this.datapath)
+      console.log(p)
+      const proc = await spawn_process(this.corepath, p, msg)
+      this._proc = proc
+    }
     this.emit('ready', this._client)
   }
 

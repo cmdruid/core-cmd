@@ -6,14 +6,18 @@ import {
   MethodArgs,
   WalletConfig,
   WalletResponse,
-  WalletList
+  WalletList,
+  TxResult
 } from '../types/index.js'
 
 import { CoreWallet } from './wallet.js'
 
 import { ensure_file_exists } from './util.js'
+import { ScanAction, ScanObject, ScanResults } from '../types/scan.js'
+import { Tx, TxBytes, TxData } from '@scrow/tapscript'
 
 export class CoreClient {
+  cookie  : string
   clipath : string
   network : string
   params  : string[]
@@ -21,6 +25,7 @@ export class CoreClient {
   constructor (config : Partial<CLIConfig> = {}) {
     const opt = { ...DEFAULT_CONFIG, ...config }
     this.clipath = opt.clipath
+    this.cookie  = opt.cookiepath ?? `${opt.datapath}/${opt.network}/.cookie`
     this.network = opt.network
     this.params  = [
       `-rpccookiefile=${opt.datapath}/${opt.network}/.cookie`,
@@ -53,6 +58,35 @@ export class CoreClient {
     const p = [ ...this.params, ...params ]
     p.push(...parse_args(method, args))
     return run_cmd(this.clipath, p)
+  }
+
+  async scan_txout (
+    action  : ScanAction,
+    ...desc : (string | ScanObject)[]
+  ) {
+    return this.cmd<ScanResults>('scantxoutset', [ action, JSON.stringify(desc) ])
+  }
+
+  async scan_addr (addr : string) {
+    return this.scan_txout('start', `addr(${addr})`).then(res => {
+      const { success, unspents } = res
+      return (success) ? unspents : []
+    })
+  }
+
+  async mine_blocks (count = 1, addr ?: string) {
+    if (this.network !== 'regtest') {
+      throw new Error('You can only generate funds on regtest network!')
+    }
+    if (addr === undefined) {
+      const wallet = await this.get_wallet('faucet')
+      addr = await wallet.get_address('faucet')
+    }
+    return this.cmd('generatetoaddress', [ count, addr ])
+  }
+
+  async get_tx (txid : string) {
+    return this.cmd<TxResult>('getrawtransaction', [ txid, true ])
   }
 
   async get_wallet (name : string) {
@@ -97,5 +131,10 @@ export class CoreClient {
       // If there was a problem with loading, throw error.
       throw new Error(`Wallet failed to create: ${JSON.stringify(res, null, 2)}`)
     }
+  }
+
+  async publish_tx (txdata : TxBytes | TxData) {
+    const txhex = Tx.to_bytes(txdata).hex
+    return this.cmd<string>('sendrawtransaction', [ txhex ])
   }
 }

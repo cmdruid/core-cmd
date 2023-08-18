@@ -4,7 +4,6 @@ import {
   Address,
   HashConfig,
   SigHash,
-  TxBytes,
   TxData,
   TxTemplate,
   Tx
@@ -20,6 +19,7 @@ import {
 } from './descriptors.js'
 
 import {
+  AddressConfig,
   MethodArgs,
   UTXO,
   WalletInfo
@@ -46,12 +46,16 @@ export class CoreWallet {
     this._init   = false
   }
 
+  get client () {
+    return this._client
+  }
+
   get name () : string {
     return this._name
   }
 
   get balance () {
-    return this._client.cmd<string>('getbalance')
+    return this.cmd<string>('getbalance')
       .then(bal => Number(bal) * SAT_MULTI)
   }
 
@@ -60,31 +64,44 @@ export class CoreWallet {
   }
 
   get newaddress () {
-    return this._call<string>('getnewaddress')
+    return this.cmd<string>('getnewaddress')
   }
 
   get utxos () {
-    return this._call<UTXO[]>('listunspent')
-      .then(e => e.map(x => { return { ...x, sats : x.amount * SAT_MULTI }}))
+    return this.cmd<UTXO[]>('listunspent')
+      .then(e => e.map(x => { return { ...x, sats : Math.round(x.amount * SAT_MULTI) }}))
   }
 
   get xprvs () {
-    return this._call<WalletInfo>('listdescriptors', 'true')
+    return this.cmd<WalletInfo>('listdescriptors', 'true')
       .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
   }
 
   get xpubs () {
-    return this._call<WalletInfo>('listdescriptors')
+    return this.cmd<WalletInfo>('listdescriptors')
       .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
   }
 
-  async _call <T = Record<string, string>> (
+  async cmd <T = Record<string, string>> (
     method : string,
     args   : MethodArgs = [],
     params : string[]   = []
   ) : Promise<T> {
     const p = [ `-rpcwallet=${this.name}`, ...params ]
     return this._client.cmd(method, args, p)
+  }
+
+  async gen_address (config : AddressConfig = {}) {
+    return this.cmd<string>('getnewaddress', config)
+  }
+
+  async get_address (label : string) {
+    return this.cmd('getaddressesbylabel', [ label ]).then(e => {
+      const entries = Object.entries(e)
+      return (entries.length !== 0)
+        ? entries[0][0]
+        : this.gen_address({ label })
+    })
   }
 
   async ensure_funds (
@@ -106,16 +123,13 @@ export class CoreWallet {
   }
 
   async generate_funds (
-    blocks   : number,
+    blocks  ?: number,
     address ?: string
   ) : Promise<void> {
-    if (this.network !== 'regtest') {
-      throw new Error('You can only generate funds on regtest network!')
-    }
     if (address === undefined) {
       address = await this.newaddress
     }
-    return this._client.cmd('generatetoaddress', [ blocks, address ])
+    return this._client.cmd('generatetoaddress', [ blocks ?? 110, address ])
   }
 
   async get_signer (
@@ -155,8 +169,9 @@ export class CoreWallet {
   }
 
   async fund_tx (
-    templ : TxTemplate,
-    txfee : number = 1000
+    templ  : TxTemplate,
+    config : HashConfig = {},
+    txfee  : number = 1000
   ) {
     const txdata = Tx.create_tx(templ)
     const vamt   = txdata.vout.reduce((prev, curr) => Number(curr.value) + prev, 0)
@@ -173,19 +188,16 @@ export class CoreWallet {
 
     for (let i = 0; i < utxos.length; i++) {
       const { desc, txid, vout, sats, scriptPubKey } = utxos[i]
+      console.log('sats:', sats)
       const { pubkey, sign_tx } = await this.get_signer(desc)
       const prevout   = { value: sats, scriptPubKey }
       const txinput   = Tx.create_vin({ txid, vout, prevout })
-      const signature = sign_tx(txdata, { sigflag: 0x81, pubkey, txinput })
+      const txconfig  = { sigflag: 0x81, pubkey, txinput }
+      const signature = sign_tx(txdata, { ...txconfig, ...config })
       const witness   = [ signature ]
       if (desc.startsWith('wpkh')) witness.push(pubkey)
       txdata.vin.push({ ...txinput, witness })
     }
     return txdata
-  }
-
-  async publish_tx (txdata : TxBytes | TxData) {
-    const txhex = Tx.to_bytes(txdata).hex
-    return this._client.cmd<string>('sendrawtransaction', [ txhex ])
   }
 }
