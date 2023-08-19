@@ -23,7 +23,6 @@ If no bitcoin core process is running, the startup script will spawn a new one.
 
 The shutdown script will gracefully shut down any bitcoin core process started by the startup script. It will not affect any existing running process of bitcoin core.
 
-
 ```ts
 import { CoreDaemon } from '@cmdcode/core-cmd'
 
@@ -33,6 +32,7 @@ const config : {
   clipath    : string    // Path to your bitcoin-cli (if not available in PATH).
   confpath   : string    // Path to your bitcoin.conf file (if exists).
   datapath   : string    // Path to your bitcoin data directory.
+  isolated   : boolean   // Starts bitcoind with random ports so it doesn't conflict.
   network    : string    // Network to use (default is regetest).
   params     : string[]  // Additional params to use when starting bitcoind.
 } = {}
