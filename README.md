@@ -21,8 +21,8 @@ The `CoreDaemon` class is designed to connect to, and control bitcoin core.
 import { CoreDaemon } from '@cmdcode/core-cmd'
 
 const config : {
-  corepath   : string    // Path to your bitcoind binary (if not available in PATH).
   cookiepath : string    // Path to your cookie file (if different than datapath).
+  corepath   : string    // Path to your bitcoind binary (if not available in PATH).
   clipath    : string    // Path to your bitcoin-cli (if not available in PATH).
   confpath   : string    // Path to your bitcoin.conf file (if exists).
   datapath   : string    // Path to your bitcoin data directory.
