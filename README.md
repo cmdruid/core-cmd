@@ -1,6 +1,6 @@
 # Core Command
 
-Take command of Bitcoin Core using a suite of automation tools and APIs.
+A suite of CI/CD friendly tools that plug into bitcoin core.
 
 ## How to Install
 

@@ -6,7 +6,8 @@ import { DEFAULT_CONFIG } from '../config.js'
 
 import {
   CoreConfig,
-  CoreEvent
+  CoreEvent,
+  RunMethod
 } from '../types/index.js'
 
 import {
@@ -51,11 +52,22 @@ export class CoreDaemon extends EventEmitter {
     })
   }
 
+  get client () : CoreClient {
+    return this._client
+  }
+
   on <U extends keyof CoreEvent> (
     event : U, 
     cb    : (arg: CoreEvent[U]) => void
   ) : this {
     return super.on(event, cb as (...args: any[]) => void)
+  }
+
+  once <U extends keyof CoreEvent> (
+    event : U, 
+    cb    : (arg: CoreEvent[U]) => void
+  ) : this {
+    return super.once(event, cb as (...args: any[]) => void)
   }
 
   emit <U extends keyof CoreEvent> (
@@ -81,14 +93,28 @@ export class CoreDaemon extends EventEmitter {
       const proc = await spawn_process(this.corepath, p, msg)
       this._proc = proc
     }
-    this.emit('ready', this._client)
+    this.emit('ready', this.client)
+    return this.client
   }
 
   async shutdown () {
     if (this._proc !== undefined) {
       const is_dead = this._proc.kill()
-      if (!is_dead)   this._proc.kill('SIGKILL')
-      process.exit()
+      if (!is_dead) this._proc.kill('SIGKILL')
     }
+  }
+
+  async run (...methods : RunMethod[]) {
+    if (this._proc === undefined) {
+      await this.startup()
+    }
+    const jobs = methods.map(async fn => {
+      return Promise.resolve(fn(this.client))
+        .then(() => true)
+        .catch(() => false)
+    })
+    const ret = await Promise.all(jobs)
+    await this.shutdown()
+    return ret
   }
 }
