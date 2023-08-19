@@ -45,6 +45,9 @@ export default function (t : Test) {
         // Mine a few blocks to confirm the tx.
         await client.mine_blocks(1)
       })
+      if (typeof txid !== 'string') {
+        t.fail('Test failed with txid: ' + txid)
+      }
       t.pass('Tests completed with txid: ' + txid)
     } catch (err) {
       t.fail(err)

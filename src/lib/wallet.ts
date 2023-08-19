@@ -188,7 +188,6 @@ export class CoreWallet {
 
     for (let i = 0; i < utxos.length; i++) {
       const { desc, txid, vout, sats, scriptPubKey } = utxos[i]
-      console.log('sats:', sats)
       const { pubkey, sign_tx } = await this.get_signer(desc)
       const prevout   = { value: sats, scriptPubKey }
       const txinput   = Tx.create_vin({ txid, vout, prevout })
