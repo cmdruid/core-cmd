@@ -1,7 +1,6 @@
 import { hd } from '@cmdcode/crypto-utils'
 
 import {
-  Address,
   HashConfig,
   SigHash,
   TxData,
@@ -20,6 +19,7 @@ import {
 
 import {
   AddressConfig,
+  AddressInfo,
   MethodArgs,
   UTXO,
   WalletInfo
@@ -60,11 +60,15 @@ export class CoreWallet {
   }
 
   get network () {
-    return this._client.network
+    return this.client.opt.network
   }
 
-  get newaddress () {
-    return this.cmd<string>('getnewaddress')
+  get newaddress () : Promise<AddressInfo> {
+    return new Promise(async res => {
+      const addr = await this.cmd<string>('getnewaddress')
+      const data = await this.parse_address(addr)
+      res(data)
+    })
   }
 
   get utxos () {
@@ -88,20 +92,38 @@ export class CoreWallet {
     params : string[]   = []
   ) : Promise<T> {
     const p = [ `-rpcwallet=${this.name}`, ...params ]
-    return this._client.cmd(method, args, p)
+    return this.client.cmd(method, args, p)
   }
 
   async gen_address (config : AddressConfig = {}) {
     return this.cmd<string>('getnewaddress', config)
   }
 
-  async get_address (label : string) {
-    return this.cmd('getaddressesbylabel', [ label ]).then(e => {
-      const entries = Object.entries(e)
-      return (entries.length !== 0)
-        ? entries[0][0]
-        : this.gen_address({ label })
+  async get_address (label : string) : Promise<AddressInfo> {
+    return new Promise(async res => {
+      let address : string
+      try {
+        const res   = await this.cmd('getaddressesbylabel', [ label ])
+        const addrs = Object.keys(res)
+        address = (addrs.length !== 0)
+          ? addrs[0]
+          : await this.gen_address({ label })
+      } catch (err) {
+        address = await this.gen_address({ label })
+      }
+      assert.ok(typeof address === 'string')
+      res(this.parse_address(address))
     })
+  }
+
+  async parse_address (address : string) {
+    return this.cmd<AddressInfo>('getaddressinfo', [ address ])
+  }
+
+  async send_funds (address : string, amt : number) {
+    const amount = Math.floor(amt / SAT_MULTI)
+    const config = { address, amount, estimate_mode: 'economical' }
+    return this.cmd('sendtoaddress', config)
   }
 
   async ensure_funds (
@@ -117,19 +139,19 @@ export class CoreWallet {
     }
   }
 
-  async get_xprv (label : string) {
-    const xprvs = await this.xprvs
-    return xprvs.find(e => label === e.label)
-  }
-
   async generate_funds (
     blocks  ?: number,
     address ?: string
   ) : Promise<void> {
     if (address === undefined) {
-      address = await this.newaddress
+      address = (await this.newaddress).address
     }
     return this._client.cmd('generatetoaddress', [ blocks ?? 110, address ])
+  }
+
+  async get_xprv (label : string) {
+    const xprvs = await this.xprvs
+    return xprvs.find(e => label === e.label)
   }
 
   async get_signer (
@@ -179,7 +201,7 @@ export class CoreWallet {
     const total  = utxos.reduce((prev, curr) => curr.sats + prev, 0)
     const change = total - vamt - txfee
     const change_addr  = await this.newaddress
-    const changePubKey = Address.parse(change_addr).script
+    const changePubKey = change_addr.scriptPubKey
 
     txdata.vout.push({
       value: change, 

@@ -1,5 +1,5 @@
 import { parse_args, run_cmd } from './cmd.js'
-import { DEFAULT_CONFIG }      from '../config.js'
+import { get_config } from '../config.js'
 
 import {
   CLIConfig,
@@ -7,7 +7,8 @@ import {
   WalletConfig,
   WalletResponse,
   WalletList,
-  TxResult
+  TxResult,
+  CoreConfig
 } from '../types/index.js'
 
 import { CoreWallet } from './wallet.js'
@@ -17,25 +18,37 @@ import { ScanAction, ScanObject, ScanResults } from '../types/scan.js'
 import { Tx, TxBytes, TxData } from '@scrow/tapscript'
 
 export class CoreClient {
-  cookie  : string
-  clipath : string
-  network : string
+  readonly _opt : CoreConfig
+
   params  : string[]
 
   constructor (config : Partial<CLIConfig> = {}) {
-    const opt = { ...DEFAULT_CONFIG, ...config }
-    this.clipath = opt.clipath
-    this.cookie  = opt.cookiepath ?? `${opt.datapath}/${opt.network}/.cookie`
-    this.network = opt.network
+    const opt = get_config(config)
+
+    if (opt.cookiepath === undefined) {
+      opt.cookiepath = `${opt.datapath}/${opt.network}/.cookie`
+    }
+
     this.params  = [
-      `-rpccookiefile=${opt.datapath}/${opt.network}/.cookie`,
-      `-chain=${this.network}`,
+      `-rpccookiefile=${opt.cookiepath}`,
+      `-chain=${opt.network}`,
       ...opt.params
     ]
+
     if (opt.confpath !== undefined) {
       ensure_file_exists(opt.confpath)
       this.params.push(`-conf=${opt.confpath}`)
     }
+
+    if (opt.rpcport !== undefined) {
+      this.params.push(`-rpcport=${opt.rpcport}`)
+    }
+
+    this._opt = opt
+  }
+
+  get opt () : CoreConfig {
+    return this._opt
   }
 
   get get_info () {
@@ -58,7 +71,7 @@ export class CoreClient {
     const p = [ ...this.params, ...params ]
     p.push(...parse_args(method, args))
     // console.log('params:', p)
-    return run_cmd(this.clipath, p)
+    return run_cmd(this.opt.clipath, p)
   }
 
   async scan_txout (
@@ -76,12 +89,13 @@ export class CoreClient {
   }
 
   async mine_blocks (count = 1, addr ?: string) {
-    if (this.network !== 'regtest') {
+    if (this.opt.network !== 'regtest') {
       throw new Error('You can only generate funds on regtest network!')
     }
     if (addr === undefined) {
       const wallet = await this.get_wallet('faucet')
-      addr = await wallet.get_address('faucet')
+      const { address } = await wallet.get_address('faucet')
+      addr = address
     }
     return this.cmd('generatetoaddress', [ count, addr ])
   }

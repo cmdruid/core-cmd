@@ -2,7 +2,7 @@
 
 A suite of CI/CD friendly tools that plug into bitcoin core.
 
-This library is designed for writing test cases that need to interact with the bitcoin block-chain.
+This library is designed for writing test cases that interact with the bitcoin blockchain.
 
 ## How to Install
 
@@ -15,7 +15,14 @@ yarn add --dev @cmdcode/core-cmd
 
 ## How to Use
 
-The `CoreDaemon` class is designed to connect to, and control bitcoin core.
+The `CoreDaemon` class is designed to connect to an existing core node, or spawn a new one.
+
+By default, the startup script will search for a running process of `bitcoind` or `bitcoin-qt`, and connect to it.
+
+If no bitcoin core process is running, the startup script will spawn a new one.
+
+The shutdown script will gracefully shut down any bitcoin core process started by the startup script. It will not affect any existing running process of bitcoin core.
+
 
 ```ts
 import { CoreDaemon } from '@cmdcode/core-cmd'
@@ -34,19 +41,31 @@ const config : {
 const core = new CoreDaemon(config)
 ```
 
-The simplest way to run code is to wrap it within the `run` method:
+The basic way to run a script through bitcoin core is to use the `startup` and `shutdown` methods. These methods help ensure that bitcoin core is cleaned up properly once the test completes.
+
+```ts
+const core   = new CoreDaemon({ datapath: `${process.env.HOME}/.bitcoin` })
+const client = await core.startup()
+
+console.log(await client.get_info)
+core.shutdown()
+```
+
+To auto-magically wrap your code with `startup` and `shutdown`, you can use the `run` method.
+
+The `run` method will take any number of callback methods, and pass a `CoreClient` object into each one.
 
 ```ts
 await core.run(async (client : CoreClient) => {
   // Load a wallet for Alice and generate an address.
   const alice_wallet = await client.get_wallet('alice_wallet')
   const alice_recv   = await alice_wallet.newaddress
-  console.log('receive address:', alice_recv)
+  console.log('receive address:', alice_recv.address)
   // Create a tx template that pays to Alice.
   const template = {
     vout : [{
       value : 800_000,
-      scriptPubKey : Address.parse(alice_recv).script
+      scriptPubKey : alice_recv.scriptPubKey
     }]
   }
   // Load a wallet for Bob and ensure it has funds.
@@ -65,7 +84,9 @@ await core.run(async (client : CoreClient) => {
 })
 ```
 
-For better control, you can also use the `ready` event to run code.
+For better flow control, you may want to use the `ready` event to execute code.
+
+The `ready` event will emit after a sucessful run of the `startup` script.
 
 ```ts
 // When core is started, it will emit a 'ready' event with a client object.
@@ -86,7 +107,7 @@ await core.startup()
 
 ## CI/CD Testing
 
-The included `test` and `.github` folders are designed as an example of how to use this library with github actions.
+The included `test` and `.github` folders are a showcase and example of how to use this library with github actions.
 
 The example test located in `test/src/base.test.ts` uses a basic testing library called `tape`.
 
@@ -94,7 +115,7 @@ Feel free to copy this code and apply it to your own testing framework and CI/CD
 
 ## Bugs / Issues
 
-Please feel free to post any questions or bug reports on the issues page!
+Please post any questions or bug reports on the issues page.
 
 There will likely be a number of cross-platform issues since I only have access to a linux machine for development. I will greatly appreciate any help and feedback from devs running into issues on Windows and OSX!
 

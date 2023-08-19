@@ -9,6 +9,7 @@ export function get_test_core () {
     clipath  : cwd + '/test/bin/bitcoin-cli',
     confpath : cwd + '/test/bitcoin.conf',
     datapath : cwd + '/test/data',
+    isolated : true,
     network  : 'regtest'
   }
 

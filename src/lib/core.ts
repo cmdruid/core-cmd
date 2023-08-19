@@ -1,7 +1,7 @@
-import EventEmitter       from 'events'
-import { ChildProcess }   from 'child_process'
-import { CoreClient }     from './client.js'
-import { DEFAULT_CONFIG } from '../config.js'
+import EventEmitter     from 'events'
+import { ChildProcess } from 'child_process'
+import { CoreClient }   from './client.js'
+import { get_config }   from '../config.js'
 
 import {
   check_process,
@@ -19,30 +19,39 @@ import {
   RunMethod
 } from '../types/index.js'
 
+const RAND_PORT = () => Math.floor((Math.random() * 10 ** 5 % 25_000) + 25_000)
+
 export class CoreDaemon extends EventEmitter {
   readonly _client  : CoreClient
-  readonly corepath : string
-  readonly datapath : string
-  readonly network  : string
+  readonly _opt     : CoreConfig
   readonly params   : string[]
 
   _proc ?: ChildProcess
 
   constructor (config ?: Partial<CoreConfig>) {
     super()
-    const opt = { ...DEFAULT_CONFIG, ...config }
-    this._client  = new CoreClient(config)
-    this.corepath  = opt.corepath
-    this.datapath = opt.datapath
-    this.network  = opt.network
+    const opt = get_config(config)
+
+    if (opt.isolated) {
+      opt.rpcport = RAND_PORT()
+    }
+
+    this._client  = new CoreClient(opt)
+
     this.params   = [
-      `-chain=${this.network}`,
+      `-chain=${opt.network}`,
       `-datadir=${opt.datapath}`,
       ...opt.params
     ]
     if (opt.confpath !== undefined) {
       ensure_file_exists(opt.confpath)
       this.params.push(`-conf=${opt.confpath}`)
+    }
+    if (opt.isolated) {
+      this.params.push(`-port=${opt.rpcport - 1}`)
+    }
+    if (opt.rpcport !== undefined) {
+      this.params.push(`-rpcport=${opt.rpcport}`)
     }
     process.on('uncaughtException', (err) => {
       console.log(err.message)
@@ -54,10 +63,15 @@ export class CoreDaemon extends EventEmitter {
       console.log('Core daemon caught a promise rejection, exiting...')
       this.shutdown()
     })
+    this._opt = opt
   }
 
   get client () : CoreClient {
     return this._client
+  }
+
+  get opt () : CoreConfig {
+    return this._opt
   }
 
   on <U extends keyof CoreEvent> (
@@ -81,21 +95,29 @@ export class CoreDaemon extends EventEmitter {
     return super.emit(event, arg)
   }
 
+  async _start (params : string[] = []) {
+    const { corepath, datapath } = this.opt
+    const p   = [ ...this.params, ...params ]
+    const msg = 'loadblk thread exit'
+    await ensure_path_exists(datapath)
+    console.log('Starting bitcoin core daemon with params:')
+    console.log('exec:', corepath)
+    console.log('data:', datapath)
+    console.log(p)
+    this._proc = await spawn_process(corepath, p, msg)
+  }
+
   async startup (params : string[] = []) {
-    if (await check_process('bitcoin-qt')) {
-      console.log('Using existing Bitcoin QT instance...')
-    } else if (await check_process('bitcoind')) {
-      console.log('Using existing Bitcoin daemon...')
+    if (this.opt.isolated) {
+      await this._start(params)
     } else {
-      const p = [ ...this.params, ...params ]
-      const msg  = 'loadblk thread exit'
-      await ensure_path_exists(this.datapath)
-      console.log('Starting bitcoin core daemon with params:')
-      console.log('exec:', this.corepath)
-      console.log('data:', this.datapath)
-      console.log(p)
-      const proc = await spawn_process(this.corepath, p, msg)
-      this._proc = proc
+      if (await check_process('bitcoin-qt')) {
+        console.log('Using existing Bitcoin QT instance...')
+      } else if (await check_process('bitcoind')) {
+        console.log('Using existing Bitcoin daemon...')
+      } else {
+        await this._start(params)
+      }
     }
     this.emit('ready', this.client)
     return this.client
@@ -114,8 +136,8 @@ export class CoreDaemon extends EventEmitter {
     }
     const jobs = methods.map(async fn => {
       return Promise.resolve(fn(this.client))
-        .then(() => true)
-        .catch(() => false)
+        .then(() => null)
+        .catch((err) => err)
     })
     const ret = await Promise.all(jobs)
     await this.shutdown()

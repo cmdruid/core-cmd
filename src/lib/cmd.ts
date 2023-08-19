@@ -63,6 +63,7 @@ export function spawn_process (
         init = true
         res(proc)
       }
+      // console.log('[stdout]:', data.toString())
     })
     proc.stderr.on('data', (data : string) => {
       if (init = false) rej(data)
