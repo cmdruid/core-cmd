@@ -2,6 +2,8 @@
 
 A suite of CI/CD friendly tools that plug into bitcoin core.
 
+This library is designed for writing test cases that need to interact with the bitcoin block-chain.
+
 ## How to Install
 
 ```sh
@@ -50,6 +52,14 @@ core.on('ready', async (client) => {
 // To kick-off the above logic, start up core.
 await core.startup()
 ```
+
+## CI/CD Testing
+
+The included `test` and `.github` folders are designed as an example of how to use this library with github actions.
+
+The example test located in `test/src/base.test.ts` uses a basic testing library called `tape`.
+
+Feel free to copy this code and apply it to your own testing framework and CI/CD pipeline.
 
 ## Script Examples
 
