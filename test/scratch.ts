@@ -5,7 +5,7 @@ import {
   CoreDaemon
 } from '../src/index.js'
 
-const core = new CoreDaemon({ datapath: '/home/cscott/.bitcoin' })
+const core = new CoreDaemon({ datapath: `${process.env.HOME}/.bitcoin` })
 
 await core.run(async (client : CoreClient) => {
   // Load a wallet for Alice and generate an address.
