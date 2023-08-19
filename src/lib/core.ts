@@ -1,19 +1,23 @@
 import EventEmitter       from 'events'
 import { ChildProcess }   from 'child_process'
-import { check_process, spawn_process }  from './cmd.js'
 import { CoreClient }     from './client.js'
 import { DEFAULT_CONFIG } from '../config.js'
+
+import {
+  check_process,
+  spawn_process
+} from './cmd.js'
+
+import {
+  ensure_file_exists,
+  ensure_path_exists
+} from './util.js'
 
 import {
   CoreConfig,
   CoreEvent,
   RunMethod
 } from '../types/index.js'
-
-import {
-  ensure_file_exists,
-  ensure_path_exists
-} from './util.js'
 
 export class CoreDaemon extends EventEmitter {
   readonly _client  : CoreClient

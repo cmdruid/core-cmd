@@ -1,7 +1,7 @@
 export * from './config.js'
 export * from './events.js'
 export * from './descriptors.js'
-export * from './util.js'
+export * from './core.js'
 export * from './wallet.js'
 
 export type MethodArgs = string | string[] | Record<string, any>
