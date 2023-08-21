@@ -7,4 +7,5 @@ core.run(async (client) => {
   const address = await wallet.newaddress
 
   console.log(address)
+  console.log('we made a change')
 })
