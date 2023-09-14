@@ -1,4 +1,4 @@
-import { ExtKey } from '@cmdcode/crypto-utils'
+import { ExtKey } from '@cmdcode/crypto-tools'
 
 export type DescriptorData = DescriptorItem & DescriptorMeta
 
