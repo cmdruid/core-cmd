@@ -1,21 +1,30 @@
-import { parse_args, run_cmd } from './cmd.js'
+import { TxBytes, TxData }      from '@scrow/tapscript'
+import { buffer_tx, decode_tx } from '@scrow/tapscript/tx'
+
 import { get_config } from '../config.js'
+import { CoreWallet } from './wallet.js'
+
+import {
+  parse_args,
+  run_cmd
+} from './cmd.js'
+
+import {
+  ensure_file_exists
+} from './util.js'
 
 import {
   CLIConfig,
   MethodArgs,
+  ScanAction,
+  ScanObject,
+  ScanResults,
   WalletConfig,
   WalletResponse,
   WalletList,
   TxResult,
   CoreConfig
 } from '../types/index.js'
-
-import { CoreWallet } from './wallet.js'
-
-import { ensure_file_exists } from './util.js'
-import { ScanAction, ScanObject, ScanResults } from '../types/scan.js'
-import { Tx, TxBytes, TxData } from '@scrow/tapscript'
 
 export class CoreClient {
   readonly _opt : CoreConfig
@@ -101,7 +110,8 @@ export class CoreClient {
   }
 
   async get_tx (txid : string) {
-    return this.cmd<TxResult>('getrawtransaction', [ txid, true ])
+    const { hex, ...meta } = await this.cmd<TxResult>('getrawtransaction', [ txid, true ])
+    return { hex, meta, txdata : decode_tx(hex) }
   }
 
   async get_wallet (name : string) {
@@ -149,7 +159,7 @@ export class CoreClient {
   }
 
   async publish_tx (txdata : TxBytes | TxData) {
-    const txhex = Tx.to_bytes(txdata).hex
+    const txhex = buffer_tx(txdata).hex
     return this.cmd<string>('sendrawtransaction', [ txhex ])
   }
 }

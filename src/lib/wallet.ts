@@ -1,12 +1,20 @@
 import { derive_key } from '@cmdcode/crypto-tools/hd'
 
 import {
-  HashConfig,
-  SigHash,
+  SigHashOptions,
   TxData,
   TxTemplate,
-  Tx
 } from '@scrow/tapscript'
+
+import {
+  segwit,
+  taproot
+} from '@scrow/tapscript/sighash'
+
+import {
+  create_tx,
+  create_vin
+} from '@scrow/tapscript/tx'
 
 import assert from 'assert'
 
@@ -24,8 +32,6 @@ import {
   UTXO,
   WalletInfo
 } from '../types/index.js'
-
-const { segwit, taproot } = SigHash
 
 const SAT_MULTI = 100_000_000
 
@@ -121,9 +127,9 @@ export class CoreWallet {
   }
 
   async send_funds (address : string, amt : number) {
-    const amount = Math.floor(amt / SAT_MULTI)
-    const config = { address, amount, estimate_mode: 'economical' }
-    return this.cmd('sendtoaddress', config)
+    const amount  = Math.floor(amt / SAT_MULTI)
+    const config  = { address, amount, estimate_mode: 'economical' }
+    return this.cmd<string>('sendtoaddress', config)
   }
 
   async ensure_funds (
@@ -164,7 +170,7 @@ export class CoreWallet {
     const { seckey, pubkey } = derive_key(fullpath, master_key, code, true)
     assert.ok(seckey !== null)
     const signer  = (keytype === 'tr') ? taproot : segwit
-    const sign_tx = (txdata : TxData, config : HashConfig) => {
+    const sign_tx = (txdata : TxData, config : SigHashOptions) => {
       return signer.sign_tx(seckey, txdata, config)
     }
     return { pubkey, sign_tx }
@@ -192,10 +198,10 @@ export class CoreWallet {
 
   async fund_tx (
     templ  : TxTemplate,
-    config : HashConfig = {},
+    config : SigHashOptions = {},
     txfee  : number = 1000
   ) {
-    const txdata = Tx.create_tx(templ)
+    const txdata = create_tx(templ)
     const vamt   = txdata.vout.reduce((prev, curr) => Number(curr.value) + prev, 0)
     const utxos  = await this.select_utxos(vamt + txfee)
     const total  = utxos.reduce((prev, curr) => curr.sats + prev, 0)
@@ -204,7 +210,7 @@ export class CoreWallet {
     const changePubKey = change_addr.scriptPubKey
 
     txdata.vout.push({
-      value: change, 
+      value : BigInt(change), 
       scriptPubKey: changePubKey
     })
 
@@ -212,11 +218,11 @@ export class CoreWallet {
       const { desc, txid, vout, sats, scriptPubKey } = utxos[i]
       const { pubkey, sign_tx } = await this.get_signer(desc)
       const prevout   = { value: sats, scriptPubKey }
-      const txinput   = Tx.create_vin({ txid, vout, prevout })
+      const txinput   = create_vin({ txid, vout, prevout })
       const txconfig  = { sigflag: 0x81, pubkey, txinput }
       const signature = sign_tx(txdata, { ...txconfig, ...config })
-      const witness   = [ signature ]
-      if (desc.startsWith('wpkh')) witness.push(pubkey)
+      const witness   = [ signature.hex ]
+      if (desc.startsWith('wpkh')) witness.push(pubkey.hex)
       txdata.vin.push({ ...txinput, witness })
     }
     return txdata

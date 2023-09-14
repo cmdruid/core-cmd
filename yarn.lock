@@ -174,10 +174,14 @@
   resolved "https://registry.yarnpkg.com/@noble/hashes/-/hashes-1.3.2.tgz#6f26dbc8fbc7205873ce3cee2f690eba0d421b39"
   integrity sha512-MVC8EAQp7MvEcm30KWENFjgR+Mkmf+D189XJTkFIlwohU5hcBbn1ZkKq7KVTi2Hme3PMGF390DaL52beVrIihQ==
 
-"@scrow/tapscript@^2.0.2":
-  version "2.0.2"
-  resolved "https://registry.yarnpkg.com/@scrow/tapscript/-/tapscript-2.0.2.tgz#d2100d6962a8932b7d5e4ce13a62882638cbe7f4"
-  integrity sha512-0Ima5UEHATAbpKkroX+hSKcPbVgtTvegfQdSWiUs6NorAqQt19Jef7GlDRN+YAWyxeccw9iGelWwXCECP0qhGw==
+"@scrow/tapscript@^2.0.11":
+  version "2.0.11"
+  resolved "https://registry.yarnpkg.com/@scrow/tapscript/-/tapscript-2.0.11.tgz#82bd10a9ba9c3c00efc46e27eab7289fdfa56c1b"
+  integrity sha512-Zgqm9MGtfX9bMnE59+7GcTIziWQk7EQdLFXM+/9DS+XH9Qvt/jwU3ECl/dd2CdhQHAaK3DYFSO8KGBjdsqX3hA==
+  dependencies:
+    "@cmdcode/buff" "^2.0.2"
+    "@cmdcode/crypto-tools" "^2.4.10"
+    zod "^3.20.6"
 
 "@types/node@*":
   version "20.5.1"
@@ -1006,3 +1010,8 @@ wrappy@1:
   version "1.0.2"
   resolved "https://registry.yarnpkg.com/wrappy/-/wrappy-1.0.2.tgz#b5243d8f3ec1aa35f1364605bc0d1036e30ab69f"
   integrity sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==
+
+zod@^3.20.6:
+  version "3.22.2"
+  resolved "https://registry.yarnpkg.com/zod/-/zod-3.22.2.tgz#3add8c682b7077c05ac6f979fea6998b573e157b"
+  integrity sha512-wvWkphh5WQsJbVk1tbx1l1Ly4yg+XecD+Mq280uBGt9wa5BKSWf4Mhp6GmrkPixhMxmabYY7RbzlwVP32pbGCg==
