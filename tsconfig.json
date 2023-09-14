@@ -1,13 +1,12 @@
 {
   "compilerOptions": {
-    "module": "ESNext",
+    "module": "NodeNext",
     "target": "ESNext",
     "moduleResolution": "NodeNext",
     "rootDir": "./src",
     "outDir": "./dist",
     "sourceMap": true,
     "declaration": true,
-    "declarationDir": "./dist",
     "declarationMap": true,
     "importHelpers": true,
     "resolveJsonModule": true,

@@ -1,4 +1,4 @@
-import { hd } from '@cmdcode/crypto-utils'
+import { derive_key } from '@cmdcode/crypto-tools/hd'
 
 import {
   HashConfig,
@@ -161,7 +161,7 @@ export class CoreWallet {
     const xprv = await this.get_xprv(parent_label)
     assert.ok(xprv?.extkey?.seckey !== undefined)
     const { seckey: master_key, code } = xprv.extkey
-    const { seckey, pubkey } = hd.derive(fullpath, master_key, code, true)
+    const { seckey, pubkey } = derive_key(fullpath, master_key, code, true)
     assert.ok(seckey !== null)
     const signer  = (keytype === 'tr') ? taproot : segwit
     const sign_tx = (txdata : TxData, config : HashConfig) => {

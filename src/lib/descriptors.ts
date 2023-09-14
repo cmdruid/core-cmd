@@ -1,4 +1,6 @@
-import { ExtKey, hash, hd } from '@cmdcode/crypto-utils'
+import { ExtKey }       from '@cmdcode/crypto-tools'
+import { parse_extkey } from '@cmdcode/crypto-tools/hd'
+import { hash160 }      from '@cmdcode/crypto-tools/hash'
 
 import {
   DescriptorData,
@@ -56,11 +58,11 @@ export function parse_desc (
       label  : string
 
   if (is_extended) {
-    extkey = hd.decode_extkey(keystr)
-    label  = hash.hash160(extkey.pubkey).slice(0, 4).hex
+    extkey = parse_extkey(keystr)
+    label  = hash160(extkey.pubkey).slice(0, 4).hex
   } else {
     extkey = undefined
-    label  = hash.hash160(keystr).slice(0, 4).hex
+    label  = hash160(keystr).slice(0, 4).hex
   }
 
   return {
