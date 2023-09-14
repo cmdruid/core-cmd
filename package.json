@@ -1,6 +1,6 @@
 {
   "name": "@cmdcode/core-cmd",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Command Bitcoin Core using a suite of automation tools.",
   "author": "Christopher Scott",
   "license": "MIT",
@@ -32,13 +32,13 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist/*",
-    "release": "yarn clean && yarn build",
+    "release": "yarn clean && yarn test && yarn build",
     "scratch": "tsx test/scratch.ts",
     "test": "tsx test/tape.ts"
   },
   "dependencies": {
     "@cmdcode/crypto-tools": "^2.4.10",
-    "@scrow/tapscript": "^2.0.2",
+    "@scrow/tapscript": "^2.0.11",
     "@types/node": "^18.13.0"
   },
   "devDependencies": {
