@@ -11,7 +11,6 @@ export async function check_path_exists (filepath : string) {
 
 export async function ensure_path_exists(path : string) {
   if (!await check_path_exists(path)) {
-    console.log('path does not exist:', path)
     await mkdir(path)
   }
 }

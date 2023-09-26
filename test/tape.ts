@@ -11,7 +11,7 @@ tape('Core Command test suite.', async t => {
     clipath  : 'test/bin/bitcoin-cli',
     confpath : 'test/bitcoin.conf',
     datapath : 'test/data',
-    debug    : true,
+    debug    : false,
     isolated : true,
     network  : 'regtest',
     core_params : [ '-txindex' ]
