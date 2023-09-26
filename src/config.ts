@@ -3,7 +3,6 @@ import { CoreConfig } from './types/config.js'
 export const DEFAULT_CONFIG : CoreConfig = {
   corepath    : 'bitcoind',
   clipath     : 'bitcoin-cli',
-  datapath    : `${process.cwd()}/coredata`,
   debug       : false,
   isolated    : false,
   network     : 'regtest',

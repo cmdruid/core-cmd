@@ -5,7 +5,7 @@ export interface CoreConfig {
   cookiepath ?: string
   clipath     : string
   confpath   ?: string
-  datapath    : string
+  datapath   ?: string
   debug       : boolean
   isolated    : boolean
   network     : string
