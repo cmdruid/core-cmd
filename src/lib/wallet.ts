@@ -30,30 +30,38 @@ import {
   AddressInfo,
   MethodArgs,
   UTXO,
+  WalletDescriptors,
   WalletInfo
 } from '../types/index.js'
 
 const DUST_LIMIT  = 1_000
+    , MIN_TX_FEE  = 1_000
     , SAT_MULTI   = 100_000_000
     , RANDOM_SORT = () => Math.random() > 0.5 ? 1 : -1
 
 export class CoreWallet {
   readonly _client : CoreClient
   readonly _name   : string
-  
-  _init : boolean
+  readonly _txfee  : number
+
+  _info ?: WalletInfo
 
   constructor (
     client : CoreClient,
-    wallet_name = 'test_wallet'
+    label  = 'test_wallet',
+    txfee  = MIN_TX_FEE
   ) {
     this._client = client
-    this._name   = wallet_name
-    this._init   = false
+    this._name   = label
+    this._txfee  = txfee
   }
 
   get client () {
     return this._client
+  }
+
+  get info () {
+    return this.get_info()
   }
 
   get name () : string {
@@ -79,12 +87,12 @@ export class CoreWallet {
   }
 
   get xprvs () {
-    return this.cmd<WalletInfo>('listdescriptors', 'true')
+    return this.cmd<WalletDescriptors>('listdescriptors', 'true')
       .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
   }
 
   get xpubs () {
-    return this.cmd<WalletInfo>('listdescriptors')
+    return this.cmd<WalletDescriptors>('listdescriptors')
       .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
   }
 
@@ -95,6 +103,13 @@ export class CoreWallet {
   ) : Promise<T> {
     const p = [ `-rpcwallet=${this.name}`, ...params ]
     return this.client.cmd(method, args, p)
+  }
+
+  async get_info (refresh = false) {
+    if (refresh || this._info === undefined) {
+      this._info = await this.cmd<WalletInfo>('getwalletinfo')
+    }
+    return this._info
   }
 
   async gen_address (config : AddressConfig = {}) {
@@ -123,6 +138,7 @@ export class CoreWallet {
   }
 
   async send_funds (address : string, amt : number) {
+    await this.ensure_txfee_config()
     const amount  = amt / SAT_MULTI
     const config  = { address, amount, estimate_mode: 'economical' }
     return this.cmd<string>('sendtoaddress', config)
@@ -138,6 +154,15 @@ export class CoreWallet {
         await this.generate_funds(blocks)
         return this.ensure_funds(min_bal, blocks)
       }
+    }
+  }
+
+  async ensure_txfee_config () {
+    const { paytxfee } = await this.info
+    const wallet_txfee = this._txfee / SAT_MULTI
+    if (paytxfee !== wallet_txfee) {
+      this.cmd<boolean>('settxfee', [ wallet_txfee  ])
+      this.get_info(true)
     }
   }
 

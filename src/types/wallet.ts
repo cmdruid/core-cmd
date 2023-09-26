@@ -19,9 +19,29 @@ export interface WalletResponse {
   warning : string  // Warning message if wallet was not loaded cleanly.
 }
 
-export interface WalletInfo {
+export interface WalletDescriptors {
   wallet_name : string
   descriptors : DescriptorItem[]
+}
+
+export interface WalletInfo {
+  walletname              : string
+  walletversion           : number
+  format                  : string
+  balance                 : number
+  unconfirmed_balance     : number
+  immature_balance        : number
+  txcount                 : number
+  keypoololdest           : number
+  keypoolsize             : number
+  hdseedid                : string
+  paytxfee                : number
+  private_keys_enabled    : boolean
+  avoid_reuse             : boolean
+  scanning                : boolean
+  descriptors             : boolean
+  external_signer         : boolean
+  keypoolsize_hd_internal : number
 }
 
 export interface UTXO {

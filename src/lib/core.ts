@@ -36,30 +36,33 @@ export class CoreDaemon extends EventEmitter {
 
     const { isolated, throws } = opt
 
-
     if (isolated) {
-      opt.rpcport = RAND_PORT()
+      const port = RAND_PORT()
+      opt.peer_port = port
+      opt.rpc_port  = port + 1
     }
 
     this._client  = new CoreClient(opt)
     this._closing = false
 
-    this.params   = [
+    this.params = [
       `-chain=${opt.network}`,
-      `-datadir=${opt.datapath}`,
+      `-port=${opt.peer_port}`,
+      `-rpcport=${opt.rpc_port}`,
       ...opt.params,
       ...opt.core_params
     ]
+
     if (opt.confpath !== undefined) {
       ensure_file_exists(opt.confpath)
       this.params.push(`-conf=${opt.confpath}`)
     }
-    if (isolated) {
-      this.params.push(`-port=${opt.rpcport - 1}`)
+
+    if (opt.datapath !== undefined) {
+      ensure_path_exists(opt.datapath)
+      this.params.push(`-datadir=${opt.datapath}`)
     }
-    if (opt.rpcport !== undefined) {
-      this.params.push(`-rpcport=${opt.rpcport}`)
-    }
+
     process.on('uncaughtException', async (err) => {
       if (!this._closing) {
         console.log('[core] Daemon caught an error, exiting...')

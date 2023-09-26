@@ -45,6 +45,7 @@ export class CoreClient {
 
     this.params = [
       `-chain=${opt.network}`,
+      `-rpcport=${opt.rpc_port}`,
       ...opt.params,
       ...opt.cli_params
     ]
@@ -56,10 +57,6 @@ export class CoreClient {
     if (opt.confpath !== undefined) {
       ensure_file_exists(opt.confpath)
       this.params.push(`-conf=${opt.confpath}`)
-    }
-
-    if (opt.rpcport !== undefined) {
-      this.params.push(`-rpcport=${opt.rpcport}`)
     }
 
     this._opt = opt

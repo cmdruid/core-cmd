@@ -1,20 +1,17 @@
-import { Test }          from 'tape'
-import { create_daemon } from './util.js'
+import { Test }       from 'tape'
+import { CoreClient } from '../../src/index.js'
 
 const { DEBUG = false } = process.env
 
-export default function (t : Test) {
-  t.test('Base CI test', async t => {
+export default function (
+  tape   : Test,
+  client : CoreClient
+) {
+  tape.test('Base CI test', async t => {
 
-    const core = create_daemon()
-    
     t.plan(1)
 
-    t.teardown(() => { core.shutdown() })
-
     try {
-      const client = await core.startup()
-
       // Print information about the blockchain.
       if (DEBUG) console.log('chain info:', await client.chain_info)
 
