@@ -26,7 +26,8 @@ export class CoreDaemon extends EventEmitter {
   readonly _opt     : CoreConfig
   readonly params   : string[]
 
-  _proc ?: ChildProcess
+  _closing : boolean
+  _proc   ?: ChildProcess
 
   constructor (config ?: Partial<CoreConfig>) {
     super()
@@ -41,6 +42,7 @@ export class CoreDaemon extends EventEmitter {
     }
 
     this._client  = new CoreClient(opt)
+    this._closing = false
 
     this.params   = [
       `-chain=${opt.network}`,
@@ -59,8 +61,11 @@ export class CoreDaemon extends EventEmitter {
       this.params.push(`-rpcport=${opt.rpcport}`)
     }
     process.on('uncaughtException', async (err) => {
-      console.log('[core] Daemon caught an error, exiting...')
-      await this.shutdown()
+      if (!this._closing) {
+        console.log('[core] Daemon caught an error, exiting...')
+        await this.shutdown()
+        this._closing = true
+      }
       if (throws) {
         throw err
       } else {
@@ -68,8 +73,11 @@ export class CoreDaemon extends EventEmitter {
       }
     })
     process.on('unhandledRejection', async (reason) => {
-      console.log('[core] Daemon caught a promise rejection, exiting...')
-      await this.shutdown()
+      if (!this._closing) {
+        console.log('[core] Daemon caught a promise rejection, exiting...')
+        await this.shutdown()
+        this._closing = true
+      }
       const msg = String(reason)
       if (throws) {
         throw new Error(msg)
