@@ -41,7 +41,8 @@ export class CoreClient {
     this.params  = [
       `-rpccookiefile=${opt.cookiepath}`,
       `-chain=${opt.network}`,
-      ...opt.params
+      ...opt.params,
+      ...opt.cli_params
     ]
 
     if (opt.confpath !== undefined) {

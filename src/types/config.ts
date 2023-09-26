@@ -9,7 +9,11 @@ export interface CoreConfig {
   isolated    : boolean
   network     : string
   rpcport     : number
+  throws      : boolean
+  verbose     : boolean
   params      : string[]
+  core_params : string[]
+  cli_params  : string[]
 }
 
 export interface AddressConfig {

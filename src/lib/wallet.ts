@@ -127,7 +127,7 @@ export class CoreWallet {
   }
 
   async send_funds (address : string, amt : number) {
-    const amount  = Math.floor(amt / SAT_MULTI)
+    const amount  = amt / SAT_MULTI
     const config  = { address, amount, estimate_mode: 'economical' }
     return this.cmd<string>('sendtoaddress', config)
   }

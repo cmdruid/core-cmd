@@ -51,6 +51,7 @@ export function spawn_process (
   cmdpath  : string,
   params   : string[],
   init_msg : string,
+  throws   = false,
   timeout  = 5_000
 ) : Promise<ChildProcess> {
   return new Promise((res, rej) => {
@@ -63,21 +64,30 @@ export function spawn_process (
         init = true
         res(proc)
       }
-      // console.log('[stdout]:', data.toString())
     })
     proc.stderr.on('data', (data : string) => {
-      if (init = false) rej(data)
-      console.log('[stderr]: ' + data)
+      if (!init || throws) {
+        rej(data)
+      } else {
+        console.log('[stderr]: ' + data)
+      }
     })
     proc.on('error', err => {
-      if (init = false) rej(err.message)
-      console.error(err)
+      if (!init || throws) {
+        rej(err.message)
+      } else {
+        console.log(err)
+      }
     })
     proc.on('close', code => {
       if (code !== 0) {
-        throw new Error(`Exited with failure code: ${String(code)}`)
+        const msg = String(code)
+        if (throws) {
+          throw new Error('Process exited with code:' + msg)
+        } else {
+          console.log('Process exited with code:', msg)
+        }
       }
-      console.log('Exited successfully with code 0.')
     })
   })
 }

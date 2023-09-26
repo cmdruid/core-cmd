@@ -30,9 +30,13 @@ export class CoreDaemon extends EventEmitter {
 
   constructor (config ?: Partial<CoreConfig>) {
     super()
+
     const opt = get_config(config)
 
-    if (opt.isolated) {
+    const { isolated, throws } = opt
+
+
+    if (isolated) {
       opt.rpcport = RAND_PORT()
     }
 
@@ -41,27 +45,37 @@ export class CoreDaemon extends EventEmitter {
     this.params   = [
       `-chain=${opt.network}`,
       `-datadir=${opt.datapath}`,
-      ...opt.params
+      ...opt.params,
+      ...opt.core_params
     ]
     if (opt.confpath !== undefined) {
       ensure_file_exists(opt.confpath)
       this.params.push(`-conf=${opt.confpath}`)
     }
-    if (opt.isolated) {
+    if (isolated) {
       this.params.push(`-port=${opt.rpcport - 1}`)
     }
     if (opt.rpcport !== undefined) {
       this.params.push(`-rpcport=${opt.rpcport}`)
     }
-    process.on('uncaughtException', (err) => {
-      console.log(err.message)
+    process.on('uncaughtException', async (err) => {
       console.log('Core daemon caught an error, exiting...')
-      this.shutdown()
+      await this.shutdown()
+      if (throws) {
+        throw err
+      } else {
+        console.log(err.message)
+      }
     })
-    process.on('unhandledRejection', (reason) => {
-      console.log(reason)
+    process.on('unhandledRejection', async (reason) => {
       console.log('Core daemon caught a promise rejection, exiting...')
-      this.shutdown()
+      await this.shutdown()
+      const msg = String(reason)
+      if (throws) {
+        throw new Error(msg)
+      } else { 
+        console.log(msg)
+      }
     })
     this._opt = opt
   }
@@ -74,48 +88,52 @@ export class CoreDaemon extends EventEmitter {
     return this._opt
   }
 
-  on <U extends keyof CoreEvent> (
-    event : U, 
-    cb    : (arg: CoreEvent[U]) => void
+  on <K extends keyof CoreEvent> (
+    event : K, 
+    cb    : (arg: CoreEvent[K]) => void
   ) : this {
     return super.on(event, cb as (...args: any[]) => void)
   }
 
-  once <U extends keyof CoreEvent> (
-    event : U, 
-    cb    : (arg: CoreEvent[U]) => void
+  once <K extends keyof CoreEvent> (
+    event : K, 
+    cb    : (arg: CoreEvent[K]) => void
   ) : this {
     return super.once(event, cb as (...args: any[]) => void)
   }
 
-  emit <U extends keyof CoreEvent> (
-    event : U, 
-    arg   : CoreEvent[U]
+  emit <K extends keyof CoreEvent> (
+    event : K, 
+    arg   : CoreEvent[K]
   ): boolean {
     return super.emit(event, arg)
   }
 
   async _start (params : string[] = []) {
-    const { corepath, datapath } = this.opt
+    const { corepath, datapath, verbose } = this.opt
     const p   = [ ...this.params, ...params ]
     const msg = 'loadblk thread exit'
     await ensure_path_exists(datapath)
-    console.log('Starting bitcoin core daemon with params:')
-    console.log('exec:', corepath)
-    console.log('data:', datapath)
-    console.log(p)
+    if (verbose) {
+      console.log('Starting bitcoin core daemon with params:')
+      console.log('exec:', corepath)
+      console.log('data:', datapath)
+      console.log(p)
+    }
     this._proc = await spawn_process(corepath, p, msg)
   }
 
   async startup (params : string[] = []) {
-    if (this.opt.isolated) {
+    const { isolated, verbose } = this.opt
+    if (isolated) {
       await this._start(params)
     } else {
       if (await check_process('bitcoin-qt')) {
-        console.log('Using existing Bitcoin QT instance...')
+        if (verbose) console.log('Using existing Bitcoin QT instance...')
       } else if (await check_process('bitcoind')) {
-        console.log('Using existing Bitcoin daemon...')
+        if (verbose) console.log('Using existing Bitcoin daemon...')
       } else {
+        if (verbose) console.log('Starting new bitcoin daemon...')
         await this._start(params)
       }
     }
