@@ -80,7 +80,6 @@ export class CoreClient {
   ) : Promise<T> {
     const p = [ ...this.params, ...params ]
     p.push(...parse_args(method, args))
-    // console.log('params:', p)
     return run_cmd(this.opt.clipath, p)
   }
 
