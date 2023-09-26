@@ -6,10 +6,12 @@ export interface CoreConfig {
   clipath     : string
   confpath   ?: string
   datapath    : string
+  debug       : boolean
   isolated    : boolean
   network     : string
   rpcport     : number
   throws      : boolean
+  timeout     : number
   verbose     : boolean
   params      : string[]
   core_params : string[]

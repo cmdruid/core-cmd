@@ -29,21 +29,29 @@ import {
 export class CoreClient {
   readonly _opt : CoreConfig
 
-  params  : string[]
+  params : string[]
 
   constructor (config : Partial<CLIConfig> = {}) {
     const opt = get_config(config)
 
-    if (opt.cookiepath === undefined) {
+    const { debug } = opt
+
+    if (
+      opt.datapath   === 'string' &&
+      opt.cookiepath === undefined
+    ) {
       opt.cookiepath = `${opt.datapath}/${opt.network}/.cookie`
     }
 
-    this.params  = [
-      `-rpccookiefile=${opt.cookiepath}`,
+    this.params = [
       `-chain=${opt.network}`,
       ...opt.params,
       ...opt.cli_params
     ]
+
+    if (opt.cookiepath !== undefined) {
+      this.params.push(`-rpccookiefile=${opt.cookiepath}`)
+    }
 
     if (opt.confpath !== undefined) {
       ensure_file_exists(opt.confpath)
@@ -55,6 +63,8 @@ export class CoreClient {
     }
 
     this._opt = opt
+
+    if (debug) console.log('[debug] Initializing CLI with params:', this.params.join(' '))
   }
 
   get opt () : CoreConfig {
@@ -78,8 +88,13 @@ export class CoreClient {
     args   : MethodArgs = [],
     params : string[]   = []
   ) : Promise<T> {
+    const { debug } = this.opt
     const p = [ ...this.params, ...params ]
     p.push(...parse_args(method, args))
+    if (debug) {
+      const offset = this.params.length
+      console.log('[debug] cmd:', p.slice(offset).join(' '))
+    }
     return run_cmd(this.opt.clipath, p)
   }
 

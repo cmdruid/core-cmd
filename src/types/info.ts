@@ -15,7 +15,7 @@ export interface AddressInfo {
   hdkeypath       : string
   hdseedid        : string
   labels          : string[]
-  hdmasterfingerprint: string
+  hdmasterfingerprint : string
 }
 
 export interface TxResult {

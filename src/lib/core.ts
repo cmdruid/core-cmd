@@ -110,17 +110,16 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _start (params : string[] = []) {
-    const { corepath, datapath, verbose } = this.opt
+    const { corepath, datapath, debug, throws, timeout } = this.opt
     const p   = [ ...this.params, ...params ]
     const msg = 'loadblk thread exit'
-    await ensure_path_exists(datapath)
-    if (verbose) {
-      console.log('Starting bitcoin core daemon with params:')
-      console.log('exec:', corepath)
-      console.log('data:', datapath)
-      console.log(p)
+    if (debug) {
+      console.log('exec   :', corepath)
+      console.log('data   :', datapath)
+      console.log('params :', p.join(' '))
     }
-    this._proc = await spawn_process(corepath, p, msg)
+    await ensure_path_exists(datapath)
+    this._proc = await spawn_process(corepath, p, msg, throws, timeout)
   }
 
   async startup (params : string[] = []) {

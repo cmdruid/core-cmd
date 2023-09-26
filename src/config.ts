@@ -1,13 +1,15 @@
-import { CoreConfig } from "./types/config.js";
+import { CoreConfig } from './types/config.js'
 
 export const DEFAULT_CONFIG : CoreConfig = {
   corepath    : 'bitcoind',
   clipath     : 'bitcoin-cli',
   datapath    : `${process.cwd()}/coredata`,
+  debug       : false,
   isolated    : false,
   network     : 'regtest',
   rpcport     : 18443,
   throws      : false,
+  timeout     : 5000,
   verbose     : true,
   params      : [],
   core_params : [],
