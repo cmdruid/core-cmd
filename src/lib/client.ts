@@ -10,10 +10,6 @@ import {
 } from './cmd.js'
 
 import {
-  ensure_file_exists
-} from './util.js'
-
-import {
   CLIConfig,
   MethodArgs,
   ScanAction,
@@ -36,12 +32,12 @@ export class CoreClient {
 
     const { debug } = opt
 
-    if (
-      opt.datapath   !== undefined &&
-      opt.cookiepath === undefined
-    ) {
-      opt.cookiepath = `${opt.datapath}/${opt.network}/.cookie`
-    }
+    // if (
+    //   opt.datapath   !== undefined &&
+    //   opt.cookiepath === undefined
+    // ) {
+    //   opt.cookiepath = `${opt.datapath}/${opt.network}/.cookie`
+    // }
 
     this.params = [
       `-chain=${opt.network}`,
@@ -50,13 +46,16 @@ export class CoreClient {
       ...opt.cli_params
     ]
 
-    if (opt.cookiepath !== undefined) {
-      this.params.push(`-rpccookiefile=${opt.cookiepath}`)
+    if (opt.confpath !== undefined) {
+      this.params.push(`-conf=${opt.confpath}`)
     }
 
-    if (opt.confpath !== undefined) {
-      ensure_file_exists(opt.confpath)
-      this.params.push(`-conf=${opt.confpath}`)
+    if (opt.datapath !== undefined) {
+      this.params.push(`-datadir=${opt.datapath}`)
+    }
+
+    if (opt.cookiepath !== undefined) {
+      this.params.push(`-rpccookiefile=${opt.cookiepath}`)
     }
 
     this._opt = opt

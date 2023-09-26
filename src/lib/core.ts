@@ -54,12 +54,10 @@ export class CoreDaemon extends EventEmitter {
     ]
 
     if (opt.confpath !== undefined) {
-      ensure_file_exists(opt.confpath)
       this.params.push(`-conf=${opt.confpath}`)
     }
 
     if (opt.datapath !== undefined) {
-      ensure_path_exists(opt.datapath)
       this.params.push(`-datadir=${opt.datapath}`)
     }
 
@@ -121,18 +119,28 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _start (params : string[] = []) {
-    const { corepath = 'bitcoind', datapath, debug, throws, timeout } = this.opt
-    const p   = [ ...this.params, ...params ]
-    const msg = 'loadblk thread exit'
-    if (debug) {
-      console.log('[core] exec   :', corepath)
-      console.log('[core] data   :', datapath)
-      console.log('[core] params :', p.join(' '))
+    const { confpath, corepath, datapath, debug, throws, timeout } = this.opt
+
+    if (confpath !== undefined) {
+      await ensure_file_exists(confpath)
     }
-    if (typeof datapath === 'string') {
+
+    if (datapath !== undefined) {
       await ensure_path_exists(datapath)
     }
-    this._proc = await spawn_process(corepath, p, msg, throws, timeout)
+
+    const exec = corepath ?? 'bitcoind'
+    const msg  = 'loadblk thread exit'
+
+    params = [ ...this.params, ...params ]
+
+    if (debug) {
+      console.log('[core] exec :', exec)
+      console.log('[core] data :', datapath)
+      console.log('[core] args :', params.join(' '))
+    }
+
+    this._proc = await spawn_process(exec, params, msg, throws, timeout)
   }
 
   async startup (params : string[] = []) {
