@@ -33,9 +33,9 @@ import {
   WalletInfo
 } from '../types/index.js'
 
-const SAT_MULTI = 100_000_000
-
-const DEFAULT_SORTER   = () => Math.random() > 0.5 ? 1 : -1
+const DUST_LIMIT  = 1_000
+    , SAT_MULTI   = 100_000_000
+    , RANDOM_SORT = () => Math.random() > 0.5 ? 1 : -1
 
 export class CoreWallet {
   readonly _client : CoreClient
@@ -69,12 +69,8 @@ export class CoreWallet {
     return this.client.opt.network
   }
 
-  get newaddress () : Promise<AddressInfo> {
-    return new Promise(async res => {
-      const addr = await this.cmd<string>('getnewaddress')
-      const data = await this.parse_address(addr)
-      res(data)
-    })
+  get newaddress () : Promise<string> {
+    return this.cmd<string>('getnewaddress')
   }
 
   get utxos () {
@@ -105,7 +101,7 @@ export class CoreWallet {
     return this.cmd<string>('getnewaddress', config)
   }
 
-  async get_address (label : string) : Promise<AddressInfo> {
+  async get_address (label : string) : Promise<string> {
     return new Promise(async res => {
       let address : string
       try {
@@ -118,7 +114,7 @@ export class CoreWallet {
         address = await this.gen_address({ label })
       }
       assert.ok(typeof address === 'string')
-      res(this.parse_address(address))
+      res(address)
     })
   }
 
@@ -150,7 +146,7 @@ export class CoreWallet {
     address ?: string
   ) : Promise<void> {
     if (address === undefined) {
-      address = (await this.newaddress).address
+      address = await this.newaddress
     }
     return this._client.cmd('generatetoaddress', [ blocks ?? 110, address ])
   }
@@ -176,21 +172,37 @@ export class CoreWallet {
     return { pubkey, sign_tx }
   }
 
+  async create_vout (
+    amount   : number | bigint,
+    address ?: string,
+  ) {
+    if (typeof address !== 'string') {
+      address = await this.newaddress
+    }
+    const { scriptPubKey } = await this.parse_address(address)
+    return { value : BigInt(amount), scriptPubKey }
+  }
+
   async select_utxos (
     amount : number,
-    coinsorter = DEFAULT_SORTER
+    sorter = RANDOM_SORT
   ) : Promise<UTXO[]> {
     const selected : UTXO[] = []
 
     let total = 0
 
     const utxos = await this.utxos
-    utxos.sort(coinsorter)
+    utxos.sort(sorter)
 
     for (const utxo of utxos) {
       selected.push(utxo)
       total += utxo.sats
-      if (total >= amount) return selected
+      if (
+        total === amount ||
+        total > amount + DUST_LIMIT
+      ) {
+        return selected
+      }
     }
 
     throw new Error('Insufficient funds!')
@@ -205,13 +217,14 @@ export class CoreWallet {
     const vamt   = txdata.vout.reduce((prev, curr) => Number(curr.value) + prev, 0)
     const utxos  = await this.select_utxos(vamt + txfee)
     const total  = utxos.reduce((prev, curr) => curr.sats + prev, 0)
-    const change = total - vamt - txfee
-    const change_addr  = await this.newaddress
-    const changePubKey = change_addr.scriptPubKey
+
+    const change_sats = BigInt(total - vamt - txfee)
+    const change_addr = await this.newaddress
+    const change_data = await this.parse_address(change_addr)
 
     txdata.vout.push({
-      value : BigInt(change), 
-      scriptPubKey: changePubKey
+      value        : change_sats,
+      scriptPubKey : change_data.scriptPubKey
     })
 
     for (let i = 0; i < utxos.length; i++) {

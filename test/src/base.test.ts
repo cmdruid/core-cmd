@@ -1,10 +1,12 @@
 import { Test }          from 'tape'
-import { get_test_core } from './util.js'
+import { create_daemon } from './util.js'
+
+const { DEBUG = false } = process.env
 
 export default function (t : Test) {
   t.test('Base CI test', async t => {
 
-    const core = get_test_core()
+    const core = create_daemon()
     
     t.plan(1)
 
@@ -12,21 +14,22 @@ export default function (t : Test) {
 
     try {
       const client = await core.startup()
-      // Load a wallet for Alice and generate an address.
-      const alice_wallet = await client.get_wallet('alice_wallet')
-      const alice_recv   = await alice_wallet.newaddress
 
-      console.log('receive address:', alice_recv.address)
+      // Print information about the blockchain.
+      if (DEBUG) console.log('chain info:', await client.chain_info)
+
+      // Load a wallet for Alice.
+      const alice_wallet = await client.get_wallet('alice_wallet')
 
       // Create a tx template that pays to Alice.
       const template = {
-        vout : [{
-          value : 800_000,
-          scriptPubKey : alice_recv.scriptPubKey
-        }]
+        vout : [
+          await alice_wallet.create_vout(400_000),
+          await alice_wallet.create_vout(400_000)
+        ]
       }
 
-      console.log('template:', template)
+      if (DEBUG) console.log('template:', template)
 
       // Load a wallet for Bob and ensure it has funds.
       const bob_wallet = await client.get_wallet('bob_wallet')
@@ -35,7 +38,10 @@ export default function (t : Test) {
       // Fund the tx from Alice using Bob's wallet
       const txdata = await bob_wallet.fund_tx(template)
 
-      console.log('txdata:', txdata)
+      if (DEBUG) {
+        console.log('txdata:')
+        console.dir(txdata, { depth : null })
+      }
 
       // Publish the tx.
       const txid = await client.publish_tx(txdata)

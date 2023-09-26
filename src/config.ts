@@ -1,8 +1,6 @@
 import { CoreConfig } from './types/config.js'
 
 export const DEFAULT_CONFIG : CoreConfig = {
-  corepath    : 'bitcoind',
-  clipath     : 'bitcoin-cli',
   debug       : false,
   isolated    : false,
   network     : 'regtest',
@@ -16,7 +14,18 @@ export const DEFAULT_CONFIG : CoreConfig = {
 }
 
 export function get_config (
-  config ?: Partial<CoreConfig>
+  config : Partial<CoreConfig> = {}
 ) : CoreConfig {
+  const { confpath, corepath, clipath, datapath } = config
+  config.confpath = resolve_path(confpath)
+  config.corepath = resolve_path(corepath)
+  config.clipath  = resolve_path(clipath)
+  config.datapath = resolve_path(datapath)
   return { ...DEFAULT_CONFIG, ...config }
+}
+
+function resolve_path (path ?: string) {
+  return (typeof path === 'string' && !path.startsWith('/'))
+    ? process.cwd() + '/' + path
+    : path
 }

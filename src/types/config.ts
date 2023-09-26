@@ -1,9 +1,9 @@
 export type CLIConfig = CoreConfig
 
 export interface CoreConfig {
-  corepath    : string
+  corepath   ?: string
   cookiepath ?: string
-  clipath     : string
+  clipath    ?: string
   confpath   ?: string
   datapath   ?: string
   debug       : boolean

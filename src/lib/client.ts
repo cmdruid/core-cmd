@@ -37,7 +37,7 @@ export class CoreClient {
     const { debug } = opt
 
     if (
-      opt.datapath   === 'string' &&
+      opt.datapath   !== undefined &&
       opt.cookiepath === undefined
     ) {
       opt.cookiepath = `${opt.datapath}/${opt.network}/.cookie`
@@ -71,15 +71,15 @@ export class CoreClient {
     return this._opt
   }
 
-  get get_info () {
+  get chain_info () {
     return this.cmd<Record<string, any>>('getblockchaininfo')
   }
 
-  get list_wallets () {
+  get wallets () {
     return this.cmd<string[]>('listwallets')
   }
 
-  get list_wallet_dir () {
+  get wallet_dirs () {
     return this.cmd<WalletList>('listwalletdir')
   }
 
@@ -88,14 +88,17 @@ export class CoreClient {
     args   : MethodArgs = [],
     params : string[]   = []
   ) : Promise<T> {
-    const { debug } = this.opt
-    const p = [ ...this.params, ...params ]
-    p.push(...parse_args(method, args))
+    const { clipath = 'bitcoin-cli', debug } = this.opt
+    const witness = [
+      ...this.params, 
+      ...params, 
+      ...parse_args(method, args)
+    ]
     if (debug) {
       const offset = this.params.length
-      console.log('[debug] cmd:', p.slice(offset).join(' '))
+      console.log('[client] cmd:', witness.slice(offset).join(' '))
     }
-    return run_cmd(this.opt.clipath, p)
+    return run_cmd(clipath, witness)
   }
 
   async scan_txout (
@@ -118,8 +121,7 @@ export class CoreClient {
     }
     if (addr === undefined) {
       const wallet = await this.get_wallet('faucet')
-      const { address } = await wallet.get_address('faucet')
-      addr = address
+      addr = await wallet.get_address('faucet')
     }
     return this.cmd('generatetoaddress', [ count, addr ])
   }
@@ -141,12 +143,12 @@ export class CoreClient {
   }
 
   async is_wallet_loaded (name : string) {
-    return this.list_wallets
+    return this.wallets
       .then((wallets) => Array.isArray(wallets) && wallets.includes(name))
   }
 
   async is_wallet_created (name : string) {
-    return this.list_wallet_dir
+    return this.wallet_dirs
       .then((res) => res.wallets.find(e => e.name === name))
   }
 

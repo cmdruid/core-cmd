@@ -27,14 +27,19 @@ The shutdown script will gracefully shut down any bitcoin core process started b
 import { CoreDaemon } from '@cmdcode/core-cmd'
 
 const config : {
-  cookiepath : string    // Path to your cookie file (if different than datapath).
-  corepath   : string    // Path to your bitcoind binary (if not available in PATH).
-  clipath    : string    // Path to your bitcoin-cli (if not available in PATH).
-  confpath   : string    // Path to your bitcoin.conf file (if exists).
-  datapath   : string    // Path to your bitcoin data directory.
-  isolated   : boolean   // Starts bitcoind with random ports so it doesn't conflict.
-  network    : string    // Network to use (default is regetest).
-  params     : string[]  // Additional params to use when starting bitcoind.
+  cookiepath  ?: string    // Path to your cookie file (if different than datapath).
+  corepath    ?: string    // Path to your bitcoind binary (if not available in PATH).
+  clipath     ?: string    // Path to your bitcoin-cli (if not available in PATH).
+  confpath    ?: string    // Path to your bitcoin.conf file (if exists).
+  datapath    ?: string    // Path to your bitcoin data directory.
+  params      ?: string[]  // Additional params to use when starting bitcoind and bitcoin-cli.
+  core_params ?: string[]  // Additional params to use when starting bitcoind.
+  cli_params  ?: string[]  // Additional params to use when starting bitcoin-cli.
+  debug       ?: boolean   // Provides addition console output for debugging.
+  isolated    ?: boolean   // Starts bitcoind with random ports so it doesn't conflict with an existing process.
+  network     ?: string    // Network to use (default is regetest).
+  throws      ?: boolean   // Ensure client and core process always throws an exception on error.
+  verbose     ?: boolean   // Provides additional verbosity to console output.
 } = {}
 
 // Create a new daemon instance (with optional config).

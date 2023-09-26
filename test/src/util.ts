@@ -1,20 +1,14 @@
 import { CoreDaemon } from '../../src/index.js'
-import { CoreConfig } from '../../src/types/config.js'
 
-export function get_test_core () {
-  const cwd = process.cwd()
-
-  const config : Partial<CoreConfig> = {
-    // corepath : cwd + '/test/bin/bitcoind',
-    // clipath  : cwd + '/test/bin/bitcoin-cli',
-    // confpath : cwd + '/test/bitcoin.conf',
-    // datapath : cwd + '/test/data',
-    debug    : true,
-    isolated : false,
+export function create_daemon () {
+  return new CoreDaemon({
+    corepath : 'test/bin/bitcoind',
+    clipath  : 'test/bin/bitcoin-cli',
+    confpath : 'test/bitcoin.conf',
+    datapath : 'test/data',
+    debug    : false,
+    isolated : true,
     network  : 'regtest',
     core_params : [ '-txindex' ]
-
-  }
-
-  return new CoreDaemon(config)
+  })
 }
