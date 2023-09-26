@@ -118,7 +118,9 @@ export class CoreDaemon extends EventEmitter {
       console.log('data   :', datapath)
       console.log('params :', p.join(' '))
     }
-    await ensure_path_exists(datapath)
+    if (datapath === 'string') {
+      await ensure_path_exists(datapath)
+    }
     this._proc = await spawn_process(corepath, p, msg, throws, timeout)
   }
 
