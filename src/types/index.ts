@@ -6,4 +6,6 @@ export * from './info.js'
 export * from './scan.js'
 export * from './wallet.js'
 
-export type MethodArgs = string | string[] | Record<string, any>
+export type Literal = string | number | boolean | null
+
+export type MethodArgs = Literal | Literal[] | Record<string, any>

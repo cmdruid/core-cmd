@@ -11,17 +11,15 @@ export default function (
 
     try {
       // Load a wallet for Alice.
-      const alice_wallet = await client.get_wallet('alice_wallet')
-      const alice_addr   = await alice_wallet.newaddress
+      const { alice_wallet, bob_wallet } = await client.load_wallets('alice_wallet', 'bob_wallet')
+
+      const alice_addr = await alice_wallet.new_address
 
       // Load a wallet for Bob and ensure it has funds.
-      const bob_wallet = await client.get_wallet('bob_wallet')
       await bob_wallet.ensure_funds(60_000)
 
       // Fund the tx from Alice using Bob's wallet
-      const txid = await bob_wallet.send_funds(alice_addr, 50_000)
-
-      await client.mine_blocks(1)
+      const txid = await bob_wallet.send_funds(50_000, alice_addr, true)
 
       t.pass('Test completed with txid: ' + txid)
     } catch (err) {

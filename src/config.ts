@@ -1,12 +1,11 @@
-import { CoreConfig } from './types/config.js'
+import { CmdConfig, CoreConfig } from './types/config.js'
 
-export const DEFAULT_CONFIG : CoreConfig = {
+export const CORE_DEFAULTS : CoreConfig = {
   debug       : false,
   isolated    : false,
   network     : 'regtest',
   peer_port   : 18442,
   rpc_port    : 18443,
-  throws      : false,
   timeout     : 5000,
   verbose     : true,
   params      : [],
@@ -14,7 +13,12 @@ export const DEFAULT_CONFIG : CoreConfig = {
   cli_params  : []
 }
 
-export function get_config (
+export const CMD_DEFAULTS : CmdConfig = {
+  cache  : false,
+  params : []
+}
+
+export function core_config (
   config : Partial<CoreConfig> = {}
 ) : CoreConfig {
   const { confpath, corepath, clipath, datapath } = config
@@ -22,7 +26,13 @@ export function get_config (
   config.corepath = resolve_path(corepath)
   config.clipath  = resolve_path(clipath)
   config.datapath = resolve_path(datapath)
-  return { ...DEFAULT_CONFIG, ...config }
+  return { ...CORE_DEFAULTS, ...config }
+}
+
+export function cmd_config (
+  config : Partial<CmdConfig> = {}
+) : CmdConfig {
+  return { ...CMD_DEFAULTS, ...config }
 }
 
 function resolve_path (path ?: string) {

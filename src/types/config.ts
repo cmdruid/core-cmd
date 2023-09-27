@@ -1,4 +1,4 @@
-export type CLIConfig = CoreConfig
+export type ClientConfig = CoreConfig
 
 export interface CoreConfig {
   corepath   ?: string
@@ -11,7 +11,6 @@ export interface CoreConfig {
   network     : string
   peer_port   : number
   rpc_port    : number
-  throws      : boolean
   timeout     : number
   verbose     : boolean
   params      : string[]
@@ -21,5 +20,10 @@ export interface CoreConfig {
 
 export interface AddressConfig {
   label ?: string
-  type  ?: 'legacy' | 'p2sh-segwit' | 'bech32'
+  type  ?: 'legacy' | 'p2sh-segwit' | 'bech32' | string
+}
+
+export interface CmdConfig {
+  cache  : boolean,
+  params : string[]
 }

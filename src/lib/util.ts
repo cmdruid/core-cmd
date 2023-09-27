@@ -1,6 +1,6 @@
 import { access, constants, mkdir, writeFile } from 'fs/promises'
 
-export async function check_path_exists (filepath : string) {
+export async function path_exists (filepath : string) {
   try {
     await access(filepath, constants.R_OK | constants.W_OK)
     return true
@@ -9,14 +9,14 @@ export async function check_path_exists (filepath : string) {
   }
 }
 
-export async function ensure_path_exists(path : string) {
-  if (!await check_path_exists(path)) {
+export async function ensure_path(path : string) {
+  if (!await path_exists(path)) {
     await mkdir(path)
   }
 }
 
-export async function ensure_file_exists(filepath : string) {
-  if (!await check_path_exists(filepath)) {
+export async function ensure_file(filepath : string) {
+  if (!await path_exists(filepath)) {
     await writeFile(filepath, '')
   }
 }

@@ -1,8 +1,9 @@
 import { TxBytes, TxData }      from '@scrow/tapscript'
 import { buffer_tx, decode_tx } from '@scrow/tapscript/tx'
 
-import { get_config } from '../config.js'
-import { CoreWallet } from './wallet.js'
+import { cmd_config, core_config } from '../config.js'
+import { CoreDaemon }  from './core.js'
+import { CoreWallet }  from './wallet.js'
 
 import {
   parse_args,
@@ -10,34 +11,35 @@ import {
 } from './cmd.js'
 
 import {
-  CLIConfig,
+  ClientConfig,
   MethodArgs,
   ScanAction,
   ScanObject,
   ScanResults,
-  WalletConfig,
-  WalletResponse,
   WalletList,
   TxResult,
-  CoreConfig
+  CoreConfig,
+  CmdConfig
 } from '../types/index.js'
 
 export class CoreClient {
-  readonly _opt : CoreConfig
+  readonly _core : CoreDaemon
+  readonly _opt  : CoreConfig
+  
+  params  : string[]
 
-  params : string[]
+  _cache  : [ string, unknown ]
+  _faucet : CoreWallet | null
 
-  constructor (config : Partial<CLIConfig> = {}) {
-    const opt = get_config(config)
+  constructor (
+    core    : CoreDaemon,
+    config ?: Partial<ClientConfig>
+  ) {
+    const opt = core_config(config)
 
     const { debug } = opt
 
-    // if (
-    //   opt.datapath   !== undefined &&
-    //   opt.cookiepath === undefined
-    // ) {
-    //   opt.cookiepath = `${opt.datapath}/${opt.network}/.cookie`
-    // }
+    this._cache = [ 'null', null ]
 
     this.params = [
       `-chain=${opt.network}`,
@@ -58,7 +60,9 @@ export class CoreClient {
       this.params.push(`-rpccookiefile=${opt.cookiepath}`)
     }
 
-    this._opt = opt
+    this._opt    = opt
+    this._core   = core
+    this._faucet = null
 
     if (debug) console.log('[debug] Initializing CLI with params:', this.params.join(' '))
   }
@@ -71,30 +75,40 @@ export class CoreClient {
     return this.cmd<Record<string, any>>('getblockchaininfo')
   }
 
-  get wallets () {
-    return this.cmd<string[]>('listwallets')
+  get core () {
+    return this._core
   }
 
-  get wallet_dirs () {
-    return this.cmd<WalletList>('listwalletdir')
+  get wallets_loaded () {
+    return this.cmd<string[]>('listwallets', null, { cache : true })
+  }
+
+  get wallets_created () {
+    return this.cmd<WalletList>('listwalletdir', null, { cache : true })
+      .then(e => e.wallets.map(x => x.name))
   }
 
   async cmd <T = Record<string, string>> (
-    method : string,
-    args   : MethodArgs = [],
-    params : string[]   = []
+    method  : string,
+    args   ?: MethodArgs,
+    config ?: Partial<CmdConfig>
   ) : Promise<T> {
     const { clipath = 'bitcoin-cli', debug } = this.opt
-    const witness = [
-      ...this.params, 
-      ...params, 
-      ...parse_args(method, args)
-    ]
+    const { cache, params } = cmd_config(config)
+    const parsed  = parse_args(method, args)
+    const witness = [ ...this.params, ...params, ...parsed ]
+    const label   = witness.join('')
     if (debug) {
       const offset = this.params.length
       console.log('[client] cmd:', witness.slice(offset).join(' '))
     }
-    return run_cmd(clipath, witness)
+    if (cache && this._cache[0] === label) {
+      if (debug) console.log('[client] using cache for method:', method)
+      return this._cache[1] as T
+    } 
+    const data  = await run_cmd<T>(clipath, witness)
+    this._cache = [ label, data ]
+    return data
   }
 
   async scan_txout (
@@ -116,63 +130,51 @@ export class CoreClient {
       throw new Error('You can only generate funds on regtest network!')
     }
     if (addr === undefined) {
-      const wallet = await this.get_wallet('faucet')
-      addr = await wallet.get_address('faucet')
+      addr = await this.core.faucet.get_address('faucet')
     }
     return this.cmd('generatetoaddress', [ count, addr ])
   }
 
   async get_tx (txid : string) {
-    const { hex, ...meta } = await this.cmd<TxResult>('getrawtransaction', [ txid, true ])
+    const { hex, ...meta } = await this.cmd<TxResult>(
+      'getrawtransaction',
+      [ txid, true ],
+      { cache : true }
+    )
     return { hex, meta, txdata : decode_tx(hex) }
   }
 
-  async get_wallet (name : string) {
-    if (!await this.is_wallet_loaded(name)) {
-      if (!await this.is_wallet_created(name)) {
-        await this.create_wallet(name)
-      } else {
-        await this.load_wallet(name)
-      }
-    }
-    return new CoreWallet(this, name)
-  }
-
-  async is_wallet_loaded (name : string) {
-    return this.wallets
-      .then((wallets) => Array.isArray(wallets) && wallets.includes(name))
-  }
-
-  async is_wallet_created (name : string) {
-    return this.wallet_dirs
-      .then((res) => res.wallets.find(e => e.name === name))
-  }
-
   async load_wallet (name : string) {
-    const res = await this.cmd<WalletResponse>('loadwallet', name)
-    if (res.warning !== undefined || res.name !== name) {
-      // If there was a problem with loading, throw error.
-      throw new Error(`Wallet failed to load cleanly: ${JSON.stringify(res, null, 2)}`)
-    }
+    const wallet = new CoreWallet(this, name)
+    await wallet.load()
+    await wallet.init()
+    return wallet
   }
 
-  async create_wallet (
-    name   : string,
-    config : WalletConfig = {}
+  async load_wallets (...labels : string[]) {
+    const wallets : Record<string, CoreWallet> = {}
+    const files = await this.wallets_created
+    const names = await this.wallets_loaded
+    for (const label of labels) {
+      const wallet = new CoreWallet(this, label)
+      if (!names.includes(label)) {
+        if (!files.includes(label)) {
+          await wallet._create()
+        }
+        await wallet._load()
+      }
+      wallets[label] = wallet
+    }
+    return wallets
+  }
+
+  async publish_tx (
+    txdata : TxBytes | TxData,
+    confirm = false
   ) {
-    const payload = { wallet_name: name, ...config }
-    const res = await this.cmd<WalletResponse>('createwallet', payload)
-    if (
-      (res.warning !== undefined && res.warning !== '') ||
-      res.name !== name
-    ) {
-      // If there was a problem with loading, throw error.
-      throw new Error(`Wallet failed to create: ${JSON.stringify(res, null, 2)}`)
-    }
-  }
-
-  async publish_tx (txdata : TxBytes | TxData) {
     const txhex = buffer_tx(txdata).hex
-    return this.cmd<string>('sendrawtransaction', [ txhex ])
+    const txid  = await this.cmd<string>('sendrawtransaction', [ txhex ])
+    if (confirm) await this.mine_blocks(1)
+    return txid
   }
 }

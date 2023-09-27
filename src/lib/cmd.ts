@@ -1,6 +1,13 @@
-import { exec, spawn, ChildProcess } from 'child_process'
-
+import { RATE_LIMIT } from './const.js'
 import { MethodArgs } from '../types/index.js'
+
+import {
+  exec,
+  spawn,
+  ChildProcess
+} from 'child_process'
+
+const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
 
 export function parse_args (
   method : string,
@@ -8,14 +15,16 @@ export function parse_args (
 ) : string[] {
   const args : string[] = []
   if (Array.isArray(input)) {
-    args.push(method, ...input)
+    args.push(method, ...input.map(e => String(e)))
+  } else if (input === null) {
+    args.push(method)
   } else if (typeof input === 'object') {
     args.push('-named', method)
     for (const [ k, v ] of Object.entries(input)) {
       args.push(`${k}=${String(v)}`)
     }
   } else if (input !== undefined) {
-    args.push(method, input)
+    args.push(method, String(input))
   } else {
     args.push(method)
   }
@@ -26,6 +35,9 @@ export async function run_cmd <T> (
   cmdpath : string,
   params  : string[]
 ) : Promise<T> {
+  if (typeof RATE_LIMIT === 'number' && RATE_LIMIT !== 0) {
+    await delay(RATE_LIMIT)
+  }
   return new Promise((resolve, reject) => {
     const proc = spawn(cmdpath, params)
     let blob = ''
@@ -37,11 +49,10 @@ export async function run_cmd <T> (
     })
     proc.on('error', err => reject(err))
     proc.on('close', code => {
-      if (code !== 0) reject(new Error(`exit code: ${String(code)}`))
-      try {
-        resolve(JSON.parse(blob) as T)
-      } catch {
-        resolve(blob.replace('\n', '') as T) 
+      if (code !== 0) {
+        reject(new Error(`exit code: ${String(code)}`))
+      } else {
+        resolve(handle_data(blob) as T)
       }
     })
   })
@@ -51,7 +62,6 @@ export function spawn_process (
   cmdpath  : string,
   params   : string[],
   init_msg : string,
-  throws   = false,
   timeout  = 5_000
 ) : Promise<ChildProcess> {
   return new Promise((res, rej) => {
@@ -66,27 +76,16 @@ export function spawn_process (
       }
     })
     proc.stderr.on('data', (data : string) => {
-      if (!init || throws) {
-        rej(data)
-      } else {
-        console.log('[stderr]: ' + data)
-      }
+      if (!init) rej(data)
+      throw new Error(data)
     })
     proc.on('error', err => {
-      if (!init || throws) {
-        rej(err.message)
-      } else {
-        console.log(err)
-      }
+      if (!init) rej(err.message)
+      throw err
     })
     proc.on('close', code => {
       if (code !== 0) {
-        const msg = String(code)
-        if (throws) {
-          throw new Error('Process exited with code:' + msg)
-        } else {
-          console.log('Process exited with code:', msg)
-        }
+        throw new Error('Process exited with code:' + String(code))
       }
     })
   })
@@ -102,4 +101,12 @@ export function check_process (name : string) {
       resolve(false)
     })
   })
+}
+
+function handle_data (blob : string) {
+  try {
+    return JSON.parse(blob)
+  } catch {
+     return blob.replace('\n', '')
+  }
 }

@@ -11,10 +11,9 @@ tape('Core Command test suite.', async t => {
     clipath  : 'test/bin/bitcoin-cli',
     confpath : 'test/bitcoin.conf',
     datapath : 'test/data',
-    debug    : false,
+    debug    : true,
     isolated : true,
-    network  : 'regtest',
-    core_params : [ '-txindex' ]
+    network  : 'regtest'
   })
 
   const client = await core.startup()

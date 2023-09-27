@@ -1,6 +1,11 @@
+import assert         from 'assert'
 import { derive_key } from '@cmdcode/crypto-tools/hd'
+import { parse_addr } from '@scrow/tapscript/address'
+import { CoreClient } from './client.js'
+import { cmd_config } from '../config.js'
 
 import {
+  ScriptWord,
   SigHashOptions,
   TxData,
   TxTemplate,
@@ -16,10 +21,6 @@ import {
   create_vin
 } from '@scrow/tapscript/tx'
 
-import assert from 'assert'
-
-import { CoreClient } from './client.js'
-
 import {
   parse_desc,
   parse_descriptor
@@ -28,32 +29,37 @@ import {
 import {
   AddressConfig,
   AddressInfo,
+  CmdConfig,
   MethodArgs,
   UTXO,
+  WalletConfig,
   WalletDescriptors,
-  WalletInfo
+  WalletInfo,
+  WalletResponse
 } from '../types/index.js'
 
-const DUST_LIMIT  = 1_000
-    , MIN_TX_FEE  = 1_000
-    , SAT_MULTI   = 100_000_000
-    , RANDOM_SORT = () => Math.random() > 0.5 ? 1 : -1
+import * as CONST from './const.js'
+
+const { DUST_LIMIT, MIN_TX_FEE, SAT_MULTI, RANDOM_SORT } = CONST
 
 export class CoreWallet {
+  readonly _addrs  : Map<string, string>
   readonly _client : CoreClient
-  readonly _name   : string
-  readonly _txfee  : number
+  readonly _config : WalletConfig
+  readonly _label  : string
 
-  _info ?: WalletInfo
+  _txfee  ?: number | null
 
   constructor (
     client : CoreClient,
-    label  = 'test_wallet',
-    txfee  = MIN_TX_FEE
+    label  : string,
+    config : WalletConfig = {}
   ) {
+    this._addrs  = new Map()
+    this._config = config
     this._client = client
-    this._name   = label
-    this._txfee  = txfee
+    this._label  = label
+    this._txfee  = null
   }
 
   get client () {
@@ -61,15 +67,25 @@ export class CoreWallet {
   }
 
   get info () {
-    return this.get_info()
+    return this.cmd<WalletInfo>('getwalletinfo', null, { cache : true })
   }
 
-  get name () : string {
-    return this._name
+  get is_created () {
+    return this.client.wallets_created
+      .then(e => Array.isArray(e) && e.includes(this.label))
+  }
+
+  get is_loaded () {
+    return this.client.wallets_loaded
+      .then(e => Array.isArray(e) && e.includes(this.label))
+  }
+
+  get label () : string {
+    return this._label
   }
 
   get balance () {
-    return this.cmd<string>('getbalance')
+    return this.cmd<string>('getbalance', null, { cache : true })
       .then(bal => Number(bal) * SAT_MULTI)
   }
 
@@ -77,103 +93,134 @@ export class CoreWallet {
     return this.client.opt.network
   }
 
-  get newaddress () : Promise<string> {
-    return this.cmd<string>('getnewaddress')
+  get new_address () : Promise<string> {
+    return this.gen_address()
+  }
+
+  get new_scriptkey () : Promise<ScriptWord[]> {
+    return this.new_address.then(e => parse_addr(e).script)
   }
 
   get utxos () {
-    return this.cmd<UTXO[]>('listunspent')
+    return this.cmd<UTXO[]>('listunspent', null, { cache : true })
       .then(e => e.map(x => { return { ...x, sats : Math.round(x.amount * SAT_MULTI) }}))
   }
 
   get xprvs () {
-    return this.cmd<WalletDescriptors>('listdescriptors', 'true')
+    return this.cmd<WalletDescriptors>('listdescriptors', true, { cache : true })
       .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
   }
 
   get xpubs () {
-    return this.cmd<WalletDescriptors>('listdescriptors')
+    return this.cmd<WalletDescriptors>('listdescriptors', null, { cache : true })
       .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
   }
 
-  async cmd <T = Record<string, string>> (
-    method : string,
-    args   : MethodArgs = [],
-    params : string[]   = []
-  ) : Promise<T> {
-    const p = [ `-rpcwallet=${this.name}`, ...params ]
-    return this.client.cmd(method, args, p)
-  }
-
-  async get_info (refresh = false) {
-    if (refresh || this._info === undefined) {
-      this._info = await this.cmd<WalletInfo>('getwalletinfo')
+  async _create () {
+    const payload = { wallet_name: this.label, ...this._config }
+    const res = await this.client.cmd<WalletResponse>('createwallet', payload)
+    const err = (res.warning !== undefined && res.warning !== '')
+    if (err || res.name !== this.label) {
+      // If there was a problem with loading, throw error.
+      throw new Error(`Wallet failed to create: ${JSON.stringify(res, null, 2)}`)
     }
-    return this._info
   }
 
-  async gen_address (config : AddressConfig = {}) {
+  async _load () {
+    const res = await this.client.cmd<WalletResponse>('loadwallet', this.label)
+    if (res.warning !== undefined || res.name !== this.label) {
+      // If there was a problem with loading, throw error.
+      throw new Error(`Wallet failed to load: ${JSON.stringify(res, null, 2)}`)
+    }
+  }
+
+  async init () {
+    const info = await this.info
+    if (info.paytxfee === 0) {
+      const newtxfee = MIN_TX_FEE / SAT_MULTI
+      await this.cmd<boolean>('settxfee', newtxfee)
+    }
+  }
+
+  async load () {
+    if (!await this.is_loaded) {
+      if (!await this.is_created) {
+        await this._create()
+      } else {
+        await this._load()
+      }
+    }
+  }
+
+  async cmd <T = Record<string, string>> (
+    method  : string,
+    args    : MethodArgs = [],
+    config ?: Partial<CmdConfig>
+  ) : Promise<T> {
+    const conf  = cmd_config(config)
+    conf.params = [ ...conf.params, `-rpcwallet=${this.label}` ]
+    return this.client.cmd(method, args, conf)
+  }
+
+  async gen_address (config ?: AddressConfig) {
     return this.cmd<string>('getnewaddress', config)
   }
 
   async get_address (label : string) : Promise<string> {
-    return new Promise(async res => {
-      let address : string
-      try {
-        const res   = await this.cmd('getaddressesbylabel', [ label ])
-        const addrs = Object.keys(res)
-        address = (addrs.length !== 0)
-          ? addrs[0]
-          : await this.gen_address({ label })
-      } catch (err) {
-        address = await this.gen_address({ label })
-      }
-      assert.ok(typeof address === 'string')
-      res(address)
-    })
+    const { debug } = this.client.opt
+    let addr = this._addrs.get(label)
+    if (addr !== undefined) {
+      if (debug) console.log('[wallet] using cached address:', addr)
+      return addr
+    }
+    const addr_book = await this.cmd('getaddressesbylabel', label, { cache : true })
+    const addr_list = Object.keys(addr_book)
+
+    addr = (addr_list.length !== 0)
+      ? addr_list[0]
+      : await this.gen_address({ label })
+
+    this._addrs.set(label, addr)
+    return addr
   }
 
   async parse_address (address : string) {
-    return this.cmd<AddressInfo>('getaddressinfo', [ address ])
+    return this.cmd<AddressInfo>('getaddressinfo', address, { cache : true })
   }
 
-  async send_funds (address : string, amt : number) {
-    await this.ensure_txfee_config()
-    const amount  = amt / SAT_MULTI
-    const config  = { address, amount, estimate_mode: 'economical' }
-    return this.cmd<string>('sendtoaddress', config)
+  async send_funds (
+    amount  : number,
+    address : string,
+    mine_block = false
+  ) {
+    const amt    = amount / SAT_MULTI
+    const config = { address, amount: amt, estimate_mode: 'economical' }
+    const txid   = await this.cmd<string>('sendtoaddress', config)
+    if (mine_block) await this.client.mine_blocks(1)
+    return txid
   }
 
   async ensure_funds (
-    min_bal : number,
-    blocks  = 110
+    min_bal : number
   ) : Promise<void> {
     if (this.network === 'regtest') {
       const bal = await this.balance
       if (bal <= min_bal) {
-        await this.generate_funds(blocks)
-        return this.ensure_funds(min_bal, blocks)
+        await this.drain_facuet(min_bal)
+        return this.ensure_funds(min_bal)
       }
     }
   }
 
-  async ensure_txfee_config () {
-    const { paytxfee } = await this.info
-    const wallet_txfee = this._txfee / SAT_MULTI
-    if (paytxfee !== wallet_txfee) {
-      this.cmd<boolean>('settxfee', [ wallet_txfee  ])
-      this.get_info(true)
-    }
-  }
-
-  async generate_funds (
-    blocks  ?: number,
+  async drain_facuet (
+    amount   : number,
     address ?: string
-  ) : Promise<void> {
+  ) : Promise<string> {
     if (address === undefined) {
-      address = await this.newaddress
+      address = await this.new_address
     }
-    return this._client.cmd('generatetoaddress', [ blocks ?? 110, address ])
+    const faucet = this.client.core.faucet
+    return faucet.send_funds(amount, address, true)
   }
 
   async get_xprv (label : string) {
@@ -197,15 +244,17 @@ export class CoreWallet {
     return { pubkey, sign_tx }
   }
 
-  async create_vout (
+  async create_txout (
     amount   : number | bigint,
     address ?: string,
   ) {
     if (typeof address !== 'string') {
-      address = await this.newaddress
+      address = await this.new_address
     }
-    const { scriptPubKey } = await this.parse_address(address)
-    return { value : BigInt(amount), scriptPubKey }
+    return {
+      value : BigInt(amount),
+      scriptPubKey : parse_addr(address).script
+    }
   }
 
   async select_utxos (
@@ -244,12 +293,10 @@ export class CoreWallet {
     const total  = utxos.reduce((prev, curr) => curr.sats + prev, 0)
 
     const change_sats = BigInt(total - vamt - txfee)
-    const change_addr = await this.newaddress
-    const change_data = await this.parse_address(change_addr)
 
     txdata.vout.push({
       value        : change_sats,
-      scriptPubKey : change_data.scriptPubKey
+      scriptPubKey : await this.new_scriptkey
     })
 
     for (let i = 0; i < utxos.length; i++) {

@@ -1,7 +1,8 @@
 import EventEmitter     from 'events'
 import { ChildProcess } from 'child_process'
 import { CoreClient }   from './client.js'
-import { get_config }   from '../config.js'
+import { core_config }  from '../config.js'
+import { CoreWallet }   from './wallet.js'
 
 import {
   check_process,
@@ -9,8 +10,8 @@ import {
 } from './cmd.js'
 
 import {
-  ensure_file_exists,
-  ensure_path_exists
+  ensure_file,
+  ensure_path
 } from './util.js'
 
 import {
@@ -19,36 +20,44 @@ import {
   RunMethod
 } from '../types/index.js'
 
-const RAND_PORT = () => Math.floor((Math.random() * 10 ** 5 % 25_000) + 25_000)
+import * as CONST from './const.js'
+
+const { FALLBACK_FEE, FAUCET_MIN_BAL, SAT_MULTI, RANDOM_PORT } = CONST
 
 export class CoreDaemon extends EventEmitter {
-  readonly _client  : CoreClient
-  readonly _opt     : CoreConfig
-  readonly params   : string[]
+  readonly _client : CoreClient
+  readonly _opt    : CoreConfig
+  readonly params  : string[]
 
   _closing : boolean
+  _faucet  : CoreWallet | null
   _proc   ?: ChildProcess
+  _ready   : boolean
 
   constructor (config ?: Partial<CoreConfig>) {
     super()
 
-    const opt = get_config(config)
+    const opt = core_config(config)
 
-    const { isolated, throws } = opt
+    const { isolated } = opt
 
     if (isolated) {
-      const port = RAND_PORT()
+      const port = RANDOM_PORT()
       opt.peer_port = port
       opt.rpc_port  = port + 1
     }
 
-    this._client  = new CoreClient(opt)
+    this._client  = new CoreClient(this, opt)
     this._closing = false
+    this._faucet  = null
+    this._ready   = false
 
     this.params = [
       `-chain=${opt.network}`,
+      `-fallbackfee=${FALLBACK_FEE / SAT_MULTI }`,
       `-port=${opt.peer_port}`,
       `-rpcport=${opt.rpc_port}`,
+      '-txindex',
       ...opt.params,
       ...opt.core_params
     ]
@@ -61,31 +70,18 @@ export class CoreDaemon extends EventEmitter {
       this.params.push(`-datadir=${opt.datapath}`)
     }
 
-    process.on('uncaughtException', async (err) => {
-      if (!this._closing) {
-        console.log('[core] Daemon caught an error, exiting...')
-        await this.shutdown()
-        this._closing = true
-      }
-      if (throws) {
-        throw err
-      } else {
-        console.log(err.message)
-      }
+    process.once('uncaughtException', async (err) => {
+      console.log('[core] Daemon caught an error, exiting...')
+      await this.shutdown()
+      throw err
     })
-    process.on('unhandledRejection', async (reason) => {
-      if (!this._closing) {
-        console.log('[core] Daemon caught a promise rejection, exiting...')
-        await this.shutdown()
-        this._closing = true
-      }
-      const msg = String(reason)
-      if (throws) {
-        throw new Error(msg)
-      } else { 
-        console.log(msg)
-      }
+
+    process.once('unhandledRejection', async (reason) => {
+      console.log('[core] Daemon caught a promise rejection, exiting...')
+      await this.shutdown()
+      throw new Error(String(reason))
     })
+
     this._opt = opt
   }
 
@@ -93,8 +89,19 @@ export class CoreDaemon extends EventEmitter {
     return this._client
   }
 
+  get faucet () : CoreWallet {
+    if (this._faucet === null) {
+      throw new Error('Faucet wallet is not loaded!')
+    }
+    return this._faucet
+  }
+
   get opt () : CoreConfig {
     return this._opt
+  }
+
+  get ready () : boolean {
+    return this._ready
   }
 
   on <K extends keyof CoreEvent> (
@@ -119,14 +126,14 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _start (params : string[] = []) {
-    const { confpath, corepath, datapath, debug, throws, timeout } = this.opt
+    const { confpath, corepath, datapath, debug, timeout } = this.opt
 
     if (confpath !== undefined) {
-      await ensure_file_exists(confpath)
+      await ensure_file(confpath)
     }
 
     if (datapath !== undefined) {
-      await ensure_path_exists(datapath)
+      await ensure_path(datapath)
     }
 
     const exec = corepath ?? 'bitcoind'
@@ -140,7 +147,12 @@ export class CoreDaemon extends EventEmitter {
       console.log('[core] args :', params.join(' '))
     }
 
-    this._proc = await spawn_process(exec, params, msg, throws, timeout)
+    this._proc = await spawn_process(exec, params, msg, timeout)
+  }
+
+  async _init () {
+    this._faucet = await this.client.load_wallet('faucet')
+    return this.faucet.ensure_funds(FAUCET_MIN_BAL / SAT_MULTI)
   }
 
   async startup (params : string[] = []) {
@@ -157,14 +169,19 @@ export class CoreDaemon extends EventEmitter {
         await this._start(params)
       }
     }
+    await this._init()
+    this._ready = true
     this.emit('ready', this.client)
     return this.client
   }
 
   async shutdown () {
-    if (this._proc !== undefined) {
-      const is_dead = this._proc.kill()
-      if (!is_dead) this._proc.kill('SIGKILL')
+    if (!this._closing) {
+      this._closing = true
+      if (this._proc !== undefined) {
+        const is_dead = this._proc.kill()
+        if (!is_dead) this._proc.kill('SIGKILL')
+      }
     }
   }
 
