@@ -22,7 +22,7 @@ import {
 
 import * as CONST from './const.js'
 
-const { FALLBACK_FEE, FAUCET_MIN_BAL, SAT_MULTI, RANDOM_PORT } = CONST
+const { FALLBACK_FEE, FAUCET_MIN_BAL, INIT_BLOCK_CT, SAT_MULTI, RANDOM_PORT } = CONST
 
 export class CoreDaemon extends EventEmitter {
   readonly _client : CoreClient
@@ -151,8 +151,18 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _init () {
-    this._faucet = await this.client.load_wallet('faucet')
-    return this.faucet.ensure_funds(FAUCET_MIN_BAL / SAT_MULTI)
+    const debug   = this.opt.debug
+    const min_bal = FAUCET_MIN_BAL / SAT_MULTI
+    this._faucet  = await this.client.load_wallet('faucet')
+    if (this.opt.network === 'regtest') {
+      const addr = await this.faucet.get_address('faucet')
+        let bal  = await this.faucet.balance
+      while (bal <= min_bal) {
+        if (debug) console.log('[core] Faucet generating blocks. Balance:', bal)
+        await this.client.mine_blocks(INIT_BLOCK_CT, addr)
+        bal = await this.faucet.balance
+      }
+    }
   }
 
   async startup (params : string[] = []) {

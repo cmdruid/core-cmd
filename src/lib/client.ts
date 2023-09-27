@@ -160,8 +160,9 @@ export class CoreClient {
       if (!names.includes(label)) {
         if (!files.includes(label)) {
           await wallet._create()
+        } else {
+          await wallet._load()
         }
-        await wallet._load()
       }
       wallets[label] = wallet
     }

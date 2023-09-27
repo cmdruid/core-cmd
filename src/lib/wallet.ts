@@ -173,13 +173,13 @@ export class CoreWallet {
       if (debug) console.log('[wallet] using cached address:', addr)
       return addr
     }
-    const addr_book = await this.cmd('getaddressesbylabel', label, { cache : true })
-    const addr_list = Object.keys(addr_book)
-
-    addr = (addr_list.length !== 0)
-      ? addr_list[0]
-      : await this.gen_address({ label })
-
+    try {
+      const addr_book = await this.cmd('getaddressesbylabel', label, { cache : true })
+      const addr_list = Object.keys(addr_book)
+      addr = addr_list[0]
+    } catch {
+      addr = await this.gen_address({ label })
+    }
     this._addrs.set(label, addr)
     return addr
   }
