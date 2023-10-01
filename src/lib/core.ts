@@ -28,6 +28,7 @@ export class CoreDaemon extends EventEmitter {
   readonly _client : CoreClient
   readonly _opt    : CoreConfig
   readonly params  : string[]
+  readonly tasks   : RunMethod[]
 
   _closing : boolean
   _faucet  : CoreWallet | null
@@ -51,6 +52,7 @@ export class CoreDaemon extends EventEmitter {
     this._closing = false
     this._faucet  = null
     this._ready   = false
+    this.tasks    = []
 
     this.params = [
       `-chain=${opt.network}`,
@@ -163,6 +165,7 @@ export class CoreDaemon extends EventEmitter {
         bal = await this.faucet.balance
       }
     }
+    await Promise.all(this.tasks.map(t => t(this.client)))
   }
 
   async startup (params : string[] = []) {
