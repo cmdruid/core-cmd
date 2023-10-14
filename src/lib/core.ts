@@ -75,6 +75,7 @@ export class CoreDaemon extends EventEmitter {
     process.once('uncaughtException', async (err) => {
       console.log('[core] Daemon caught an error, exiting...')
       await this.shutdown()
+      if (opt.debug) console.dir(err, { depth: null })
       throw err
     })
 
