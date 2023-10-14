@@ -74,15 +74,14 @@ export class CoreDaemon extends EventEmitter {
 
     process.once('uncaughtException', async (err) => {
       console.log('[core] Daemon caught an error, exiting...')
+      console.dir(err, { depth: null })
       await this.shutdown()
-      if (opt.debug) console.dir(err, { depth: null })
-      throw err
     })
 
-    process.once('unhandledRejection', async (reason) => {
+    process.once('unhandledRejection', async (err) => {
       console.log('[core] Daemon caught a promise rejection, exiting...')
+      console.dir(err, { depth: null })
       await this.shutdown()
-      throw new Error(String(reason))
     })
 
     this._opt = opt
