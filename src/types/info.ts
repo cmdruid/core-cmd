@@ -1,3 +1,6 @@
+export type TxResult = TxConfirmedResult | TxUnconfirmedResult
+export type TxStatus = TxUnconfimed | TxConfirmed
+
 export interface AddressInfo {
   address         : string
   scriptPubKey    : string
@@ -18,7 +21,7 @@ export interface AddressInfo {
   hdmasterfingerprint : string
 }
 
-export interface TxResult {
+export interface TxResultData {
   txid     : string,
   hash     : string,
   version  : number,
@@ -38,7 +41,32 @@ export interface TxResult {
     n     : number
     value : number, 
     scriptPubKey : ScriptKeyResult
-  }]
+  }],
+}
+
+export interface TxUnconfirmedResult extends TxResultData {
+  blockhash     ?: string
+  confirmations ?: number
+  time          ?: number
+  blocktime     ?: number
+}
+
+export interface TxConfirmedResult extends TxResultData {
+  blockhash     : string
+  confirmations : number
+  time          : number
+  blocktime     : number
+}
+
+export interface TxUnconfimed {
+  confirmed      : false
+}
+
+export interface TxConfirmed {
+  confirmed     : true
+  blockhash     : string
+  confirmations : number
+  time          : number
 }
 
 export interface ScriptKeyResult {

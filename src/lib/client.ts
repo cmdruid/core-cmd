@@ -26,7 +26,10 @@ import {
   WalletList,
   TxResult,
   CoreConfig,
-  CmdConfig
+  CmdConfig,
+  TxStatus,
+  TxConfirmedResult,
+  TxConfirmed
 } from '../types/index.js'
 
 export class CoreClient {
@@ -158,12 +161,23 @@ export class CoreClient {
   }
 
   async get_tx (txid : string) {
-    const { hex, ...data } = await this.cmd<TxResult>(
-      'getrawtransaction',
-      [ txid, true ],
-      { cache : true }
-    )
-    return { hex, data }
+    let txdata : TxResult,
+        status : TxStatus = { confirmed : false }
+
+    try {
+      txdata = await this.cmd<TxResult>('getrawtransaction', [ txid, true ], { cache : true })
+    } catch (err) {
+      return null
+    }
+
+    const { hex, blockhash, blocktime, confirmations, time, ...data } = txdata
+
+    if (blockhash !== undefined) {
+      const {  } = data as TxConfirmedResult
+      status = { confirmed : true, blockhash, confirmations, time: blocktime } as TxConfirmed
+    }
+
+    return { data, hex, status }
   }
 
   async load_wallet (name : string) {
