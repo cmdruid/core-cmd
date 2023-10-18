@@ -1,14 +1,21 @@
-import { TxBytes, TxData }      from '@scrow/tapscript'
-import { buffer_tx, decode_tx } from '@scrow/tapscript/tx'
-
-import { cmd_config, core_config } from '../config.js'
-import { CoreDaemon }  from './core.js'
-import { CoreWallet }  from './wallet.js'
+import { buffer_tx }  from '@scrow/tapscript/tx'
+import { CoreDaemon } from './core.js'
+import { CoreWallet } from './wallet.js'
 
 import {
   parse_args,
   run_cmd
 } from './cmd.js'
+
+import {
+  cmd_config,
+  core_config
+} from '../config.js'
+
+import {
+  TxBytes,
+  TxData
+} from '@scrow/tapscript'
 
 import {
   ClientConfig,
@@ -136,12 +143,12 @@ export class CoreClient {
   }
 
   async get_tx (txid : string) {
-    const { hex, ...meta } = await this.cmd<TxResult>(
+    const { hex, ...data } = await this.cmd<TxResult>(
       'getrawtransaction',
       [ txid, true ],
       { cache : true }
     )
-    return { hex, meta, txdata : decode_tx(hex) }
+    return { hex, data }
   }
 
   async load_wallet (name : string) {
