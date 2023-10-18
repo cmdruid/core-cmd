@@ -118,6 +118,21 @@ export class CoreClient {
     return data
   }
 
+  async get_block (
+    { height, hash } : { height ?: number, hash ?: string } = {}
+  ) {
+    if (height === undefined && hash === undefined) {
+      height = await this.cmd<number>('getblockcount')
+    }
+    if (typeof height === 'number') {
+      hash = await this.cmd<string>('getblockhash', height)
+    }
+    if (typeof hash === 'string') {
+      return this.cmd('getblock', hash)
+    }
+    throw new Error('Unable to fetch any blocks!')
+  }
+
   async scan_txout (
     action  : ScanAction,
     ...desc : (string | ScanObject)[]
