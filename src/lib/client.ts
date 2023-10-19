@@ -156,13 +156,6 @@ export class CoreClient {
     return this.cmd<ScanResults>('scantxoutset', [ action, JSON.stringify(desc) ])
   }
 
-  async scan_addr (addr : string) {
-    return this.scan_txout('start', `addr(${addr})`).then(res => {
-      const { success, unspents } = res
-      return (success) ? unspents : []
-    })
-  }
-
   async mine_blocks (count = 1, addr ?: string) {
     if (this.opt.network !== 'regtest') {
       throw new Error('You can only generate funds on regtest network!')
@@ -189,6 +182,13 @@ export class CoreClient {
       status = { confirmed : true, block_height : height, block_hash, block_time }
     }
     return { data, hex, status }
+  }
+
+  async get_utxos (addr : string) {
+    return this.scan_txout('start', `addr(${addr})`).then(res => {
+      const { success, unspents } = res
+      return (success) ? unspents : null
+    })
   }
 
   async load_wallet (name : string) {
