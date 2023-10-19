@@ -1,5 +1,4 @@
-export type TxResult = TxConfirmedResult | TxUnconfirmedResult
-export type TxStatus = TxUnconfimed | TxConfirmed
+export type CoreTx = CoreTxConfirmed | CoreTxUnconfirmed
 
 export interface AddressInfo {
   address         : string
@@ -21,7 +20,7 @@ export interface AddressInfo {
   hdmasterfingerprint : string
 }
 
-export interface TxResultData {
+export interface CoreTxResult {
   txid     : string,
   hash     : string,
   version  : number,
@@ -44,30 +43,21 @@ export interface TxResultData {
   }],
 }
 
-export interface TxUnconfirmedResult extends TxResultData {
+export interface CoreTxUnconfirmed extends CoreTxResult {
   blockhash     ?: string
   confirmations ?: number
   time          ?: number
   blocktime     ?: number
 }
 
-export interface TxConfirmedResult extends TxResultData {
+export interface CoreTxConfirmed extends CoreTxResult {
   blockhash     : string
   confirmations : number
   time          : number
   blocktime     : number
 }
 
-export interface TxUnconfimed {
-  confirmed      : false
-}
 
-export interface TxConfirmed {
-  confirmed     : true
-  blockhash     : string
-  confirmations : number
-  time          : number
-}
 
 export interface ScriptKeyResult {
   asm     : string,

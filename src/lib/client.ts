@@ -18,18 +18,19 @@ import {
 } from '@scrow/tapscript'
 
 import {
+  BlockQuery,
   ClientConfig,
   MethodArgs,
   ScanAction,
   ScanObject,
   ScanResults,
   WalletList,
-  TxResult,
+  CoreTx,
   CoreConfig,
   CmdConfig,
   TxStatus,
-  TxConfirmedResult,
-  TxConfirmed
+  BlockData,
+  BlockHeader
 } from '../types/index.js'
 
 export class CoreClient {
@@ -121,19 +122,31 @@ export class CoreClient {
     return data
   }
 
-  async get_block (
-    { height, hash } : { height ?: number, hash ?: string } = {}
+  async _get_block_data (
+    query : BlockQuery, 
+    txdata = false
   ) {
+    let { height, hash } = query
     if (height === undefined && hash === undefined) {
       height = await this.cmd<number>('getblockcount')
     }
     if (typeof height === 'number') {
       hash = await this.cmd<string>('getblockhash', height)
     }
-    if (typeof hash === 'string') {
-      return this.cmd('getblock', hash)
+    if (typeof hash !== 'string') {
+      throw new Error('Unable to fetch any blocks!')
     }
-    throw new Error('Unable to fetch any blocks!')
+    return (txdata === true)
+      ? this.cmd<BlockData>('getblock', hash)
+      : this.cmd<BlockHeader>('getblockheader', hash)
+  }
+
+  async get_block (query : BlockQuery) {
+    return this._get_block_data(query, true) as Promise<BlockData>
+  }
+
+  async get_header (query : BlockQuery) {
+    return this._get_block_data(query, false) as Promise<BlockHeader>
   }
 
   async scan_txout (
@@ -161,22 +174,20 @@ export class CoreClient {
   }
 
   async get_tx (txid : string) {
-    let txdata : TxResult,
+    let txdata : CoreTx,
         status : TxStatus = { confirmed : false }
-
     try {
-      txdata = await this.cmd<TxResult>('getrawtransaction', [ txid, true ], { cache : true })
+      txdata = await this.cmd<CoreTx>('getrawtransaction', [ txid, true ], { cache : true })
     } catch (err) {
       return null
     }
-
-    const { hex, blockhash, blocktime, confirmations, time, ...data } = txdata
-
-    if (blockhash !== undefined) {
-      const {  } = data as TxConfirmedResult
-      status = { confirmed : true, blockhash, confirmations, time: blocktime } as TxConfirmed
+    const { hex, ...data } = txdata
+    const block_hash = txdata.blockhash
+    const block_time = txdata.blocktime
+    if (block_hash !== undefined && block_time !== undefined) {
+      const { height } = await this.get_header({ hash : block_hash })
+      status = { confirmed : true, block_height : height, block_hash, block_time }
     }
-
     return { data, hex, status }
   }
 
