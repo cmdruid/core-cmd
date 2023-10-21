@@ -5,6 +5,12 @@ export interface ScanObject {
   range : number | number[]
 }
 
+export interface ScanOptions {
+  address ?: string
+  pubkey  ?: string
+  script  ?: string
+}
+
 export interface ScanResults {
   success      : boolean
   txouts       : number

@@ -25,13 +25,16 @@ import {
   ScanObject,
   ScanResults,
   WalletList,
-  CoreTx,
   CoreConfig,
   CmdConfig,
-  TxStatus,
   BlockData,
-  BlockHeader
+  BlockHeader,
+  ScanOptions,
+  TxOutpoint,
+  TxResult,
+  TxStatus
 } from '../types/index.js'
+import { convert_value, convert_vout } from './util.js'
 
 export class CoreClient {
   readonly _core : CoreDaemon
@@ -80,6 +83,10 @@ export class CoreClient {
 
   get opt () : CoreConfig {
     return this._opt
+  }
+
+  get blocks () : Promise<number> {
+    return this.cmd<number>('getblockcount')
   }
 
   get chain_info () {
@@ -167,28 +174,60 @@ export class CoreClient {
   }
 
   async get_tx (txid : string) {
-    let txdata : CoreTx,
-        status : TxStatus = { confirmed : false }
     try {
-      txdata = await this.cmd<CoreTx>('getrawtransaction', [ txid, true ], { cache : true })
-    } catch (err) {
+      const res = await this.cmd<TxResult>('getrawtransaction', [ txid, true ], { cache : true })
+      res.vout = convert_vout(res.vout)
+      return res
+    } catch {
       return null
     }
-    const { hex, ...data } = txdata
-    const block_hash = txdata.blockhash
-    const block_time = txdata.blocktime
-    if (block_hash !== undefined && block_time !== undefined) {
-      const { height } = await this.get_header({ hash : block_hash })
-      status = { confirmed : true, block_height : height, block_hash, block_time }
-    }
-    return { data, hex, status }
   }
 
-  async get_utxos (addr : string) {
-    return this.scan_txout('start', `addr(${addr})`).then(res => {
+  async get_utxos (opt : ScanOptions) {
+    const desc = get_scan_desc(opt)
+    return this.scan_txout('start', desc).then(res => {
       const { success, unspents } = res
-      return (success) ? unspents : null
+      if (!success) return []
+      return unspents.map(e => {
+        return { ...e, amount : convert_value(e.amount) }
+      })
     })
+  }
+
+  async get_txout (
+    txid : string, 
+    vout : number
+  ) {
+    const res = await this.cmd<TxOutpoint | null>('gettxout', [ txid, vout ])
+    if (res === null) return null
+    res.value = convert_value(res.value)
+    return res
+  }
+
+  async get_prevout (
+    txid : string, 
+    vout : number
+  ) {
+    let status : TxStatus
+    const tx = await this.get_tx(txid)
+    if (tx === null) return null
+    const txout = tx.vout.at(vout)
+    if (txout === undefined) return null
+
+    if (
+      tx.confirmations === undefined ||
+      tx.confirmations === 0
+    ) {
+      status = { confirmed : false }
+    } else {
+      const block_hash   = tx.blockhash as string
+      const block_time   = tx.blocktime as number
+      const block_height = (await this.blocks) - tx.confirmations
+      status = { confirmed : true, block_height, block_hash, block_time }
+    }
+    const { value, scriptPubKey } = txout
+    const prevout = { value, scriptPubKey : scriptPubKey.hex }
+    return { prevout, status }
   }
 
   async load_wallet (name : string) {
@@ -225,4 +264,15 @@ export class CoreClient {
     if (confirm) await this.mine_blocks(1)
     return txid
   }
+}
+
+function get_scan_desc (opt : ScanOptions) {
+  if (opt.address !== undefined) {
+    return `addr(${opt.address})`
+  } else if (opt.pubkey !== undefined) {
+    return `combo(${opt.pubkey})`
+  } else if (opt.script) {
+    return `raw(${opt.script})`
+  }
+  throw new Error('No scan option specified!')
 }
