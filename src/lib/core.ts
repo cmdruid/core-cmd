@@ -156,7 +156,7 @@ export class CoreDaemon extends EventEmitter {
     const debug   = this.opt.debug
     const min_bal = FAUCET_MIN_BAL / SAT_MULTI
     this._faucet  = await this.client.load_wallet('faucet')
-    if (this.opt.network === 'regtest') {
+    if (this.opt.use_faucet && this.opt.network === 'regtest') {
       const addr = await this.faucet.get_address('faucet')
         let bal  = await this.faucet.balance
       while (bal <= min_bal) {

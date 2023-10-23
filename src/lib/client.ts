@@ -193,9 +193,10 @@ export class CoreClient {
     vout : number
   ) {
     const res = await this.cmd<TxOutpoint | null>('gettxout', [ txid, vout ])
+    console.log('txout:', res)
     if (res === null) return null
-    res.value = convert_value(res.value)
-    return res
+    const value = convert_value(res.value)
+    return { ...res, value }
   }
 
   async get_utxos (opt : ScanOptions) {
@@ -211,8 +212,10 @@ export class CoreClient {
 
   async find_utxo (txid : string, vout : number) {
     const txout = await this.get_txout(txid, vout)
+    console.log('txout:', txout)
     if (txout === null) return null
-    const { address } = txout.scriptPubKey
+    const address = txout.scriptPubKey?.address
+    if (address === undefined) return null
     const utxos = await this.get_utxos({ address })
       let utxo  = utxos.find(e => e.txid === txid && e.vout === vout)
     if (utxo === undefined) {
@@ -221,7 +224,7 @@ export class CoreClient {
       const height = (await this.blocks) - txout.confirmations
       const scriptPubKey = script.hex
       utxo = { amount : value, txid, vout, desc, height, coinbase, scriptPubKey }
-      return { spent : true, utxo }
+      return { spent : true }
     } else {
       utxo.amount = convert_value(utxo.amount)
       return { spent : false, utxo }

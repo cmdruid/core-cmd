@@ -2,14 +2,17 @@ export type TxStatus = TxConfirmed | TxUnconfirmed
 export type TxInput  = BaseInput | CoinInput
 
 export interface ScriptKey {
-  asm     : string
-  desc    : string
-  hex     : string
-  address : string
-  type    : string
+  asm      : string
+  desc     : string
+  hex      : string
+  address ?: string
+  type     : string
 }
 
 interface BaseInput {
+  txid        : undefined,
+  vout        : undefined,
+  scriptSig   : undefined
   txinwitness : string[],
   sequence    : number,
   coinbase    : string
@@ -37,11 +40,11 @@ export interface TxResult {
   size     : number
   vsize    : number
   weight   : number
-  fee      : number
   locktime : number
   hex      : string
   vin      : TxInput[]
   vout     : TxOutput[]
+  fee           ?: number
   blockhash     ?: string
   confirmations ?: number
   time          ?: number

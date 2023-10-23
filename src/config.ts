@@ -7,6 +7,7 @@ export const CORE_DEFAULTS : CoreConfig = {
   peer_port   : 18442,
   rpc_port    : 18443,
   timeout     : 5000,
+  use_faucet  : true,
   verbose     : true,
   params      : [],
   core_params : [],

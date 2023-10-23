@@ -1,8 +1,6 @@
 import { Test }       from 'tape'
 import { CoreClient } from '../../src/index.js'
 
-import './util.js'
-
 const { DEBUG = false } = process.env
 
 export default function (

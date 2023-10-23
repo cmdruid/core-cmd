@@ -1,1 +1,0 @@
-import { core } from '../tape.js'

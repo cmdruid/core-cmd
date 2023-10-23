@@ -1,5 +1,5 @@
 import { Test }       from 'tape'
-import { CoreClient } from '../../src'
+import { CoreClient } from '../../src/index.js'
 
 export default function (
   tape   : Test,
