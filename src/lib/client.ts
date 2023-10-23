@@ -1,6 +1,12 @@
-import { buffer_tx }  from '@scrow/tapscript/tx'
-import { CoreDaemon } from './core.js'
-import { CoreWallet } from './wallet.js'
+import { parse_script } from '@scrow/tapscript/script'
+import { buffer_tx, create_prevout }    from '@scrow/tapscript/tx'
+import { CoreDaemon }   from './core.js'
+import { CoreWallet }   from './wallet.js'
+
+import {
+  TxBytes,
+  TxData
+} from '@scrow/tapscript'
 
 import {
   parse_args,
@@ -13,9 +19,9 @@ import {
 } from '../config.js'
 
 import {
-  TxBytes,
-  TxData
-} from '@scrow/tapscript'
+  convert_value,
+  convert_vout
+} from './util.js'
 
 import {
   BlockQuery,
@@ -32,9 +38,8 @@ import {
   ScanOptions,
   TxOutpoint,
   TxResult,
-  TxStatus
+  TxStatus,
 } from '../types/index.js'
-import { convert_value, convert_vout } from './util.js'
 
 export class CoreClient {
   readonly _core : CoreDaemon
@@ -175,12 +180,22 @@ export class CoreClient {
 
   async get_tx (txid : string) {
     try {
-      const res = await this.cmd<TxResult>('getrawtransaction', [ txid, true ], { cache : true })
+      const res = await this.cmd<TxResult>('getrawtransaction', [ txid, 2 ], { cache : true })
       res.vout = convert_vout(res.vout)
       return res
     } catch {
       return null
     }
+  }
+
+  async get_txout (
+    txid : string, 
+    vout : number
+  ) {
+    const res = await this.cmd<TxOutpoint | null>('gettxout', [ txid, vout ])
+    if (res === null) return null
+    res.value = convert_value(res.value)
+    return res
   }
 
   async get_utxos (opt : ScanOptions) {
@@ -194,40 +209,47 @@ export class CoreClient {
     })
   }
 
-  async get_txout (
-    txid : string, 
-    vout : number
-  ) {
-    const res = await this.cmd<TxOutpoint | null>('gettxout', [ txid, vout ])
-    if (res === null) return null
-    res.value = convert_value(res.value)
-    return res
+  async find_utxo (txid : string, vout : number) {
+    const txout = await this.get_txout(txid, vout)
+    if (txout === null) return null
+    const { address } = txout.scriptPubKey
+    const utxos = await this.get_utxos({ address })
+      let utxo  = utxos.find(e => e.txid === txid && e.vout === vout)
+    if (utxo === undefined) {
+      const { value, scriptPubKey : script, coinbase } = txout
+      const desc   = `addr(${script.address})`
+      const height = (await this.blocks) - txout.confirmations
+      const scriptPubKey = script.hex
+      utxo = { amount : value, txid, vout, desc, height, coinbase, scriptPubKey }
+      return { spent : true, utxo }
+    } else {
+      utxo.amount = convert_value(utxo.amount)
+      return { spent : false, utxo }
+    }
   }
 
-  async get_prevout (
-    txid : string, 
-    vout : number
-  ) {
-    let status : TxStatus
+  async get_txinput (txid : string, vout : number) {
     const tx = await this.get_tx(txid)
     if (tx === null) return null
     const txout = tx.vout.at(vout)
     if (txout === undefined) return null
 
-    if (
-      tx.confirmations === undefined ||
-      tx.confirmations === 0
-    ) {
-      status = { confirmed : false }
-    } else {
+    let status : TxStatus
+
+    if (tx.confirmations !== undefined && tx.confirmations > 0) {
       const block_hash   = tx.blockhash as string
       const block_time   = tx.blocktime as number
       const block_height = (await this.blocks) - tx.confirmations
       status = { confirmed : true, block_height, block_hash, block_time }
+    } else {
+      status = { confirmed : false }
     }
+
     const { value, scriptPubKey } = txout
-    const prevout = { value, scriptPubKey : scriptPubKey.hex }
-    return { prevout, status }
+    const script  = parse_script(scriptPubKey.hex)
+    const prevout = { value, scriptPubKey : script.asm }
+    const txinput = create_prevout({ txid, vout, prevout })
+    return { txinput, status }
   }
 
   async load_wallet (name : string) {

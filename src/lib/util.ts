@@ -24,9 +24,15 @@ export async function ensure_file(filepath : string) {
 }
 
 export function convert_value (value : number) {
-  return value * 100_000_000
+  return (is_float(value)) ? value * 100_000_000 : value
 }
 
 export function convert_vout (vout : TxOutput[]) {
-  return vout.map(e => { return { ...e, value : convert_value(e.value) } })
+  return vout.map(e => {
+    return { ...e, value : convert_value(e.value) }
+  })
+}
+
+function is_float(value : number) {
+    return Number(value) === value && value % 1 !== 0
 }
