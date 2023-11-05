@@ -3,11 +3,9 @@ import { CmdConfig, CoreConfig } from './types/config.js'
 export const CORE_DEFAULTS : CoreConfig = {
   debug       : false,
   isolated    : false,
+  use_faucet  : false,
   network     : 'regtest',
-  peer_port   : 18442,
-  rpc_port    : 18443,
   timeout     : 5000,
-  use_faucet  : true,
   verbose     : true,
   params      : [],
   core_params : [],

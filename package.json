@@ -37,8 +37,8 @@
     "test": "tsx test/tape.ts"
   },
   "dependencies": {
-    "@cmdcode/crypto-tools": "^2.5.2",
-    "@scrow/tapscript": "^2.0.17",
+    "@cmdcode/crypto-tools": "^2.6.0",
+    "@scrow/tapscript": "^2.1.0",
     "@types/node": "^20.8.6"
   },
   "devDependencies": {

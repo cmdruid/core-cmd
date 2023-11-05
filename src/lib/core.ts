@@ -57,12 +57,17 @@ export class CoreDaemon extends EventEmitter {
     this.params = [
       `-chain=${opt.network}`,
       `-fallbackfee=${FALLBACK_FEE / SAT_MULTI }`,
-      `-port=${opt.peer_port}`,
-      `-rpcport=${opt.rpc_port}`,
-      '-txindex',
       ...opt.params,
       ...opt.core_params
     ]
+
+    if (opt.peer_port !== undefined) {
+      this.params.push(`-port=${opt.peer_port}`)
+    }
+
+    if (opt.rpc_port !== undefined) {
+      this.params.push(`-rpcport=${opt.rpc_port}`)
+    }
 
     if (opt.confpath !== undefined) {
       this.params.push(`-conf=${opt.confpath}`)

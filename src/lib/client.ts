@@ -1,5 +1,4 @@
 import { parse_script } from '@scrow/tapscript/script'
-import { buffer_tx, create_prevout }    from '@scrow/tapscript/tx'
 import { CoreDaemon }   from './core.js'
 import { CoreWallet }   from './wallet.js'
 
@@ -7,6 +6,11 @@ import {
   TxBytes,
   TxData
 } from '@scrow/tapscript'
+
+import {
+  buffer_tx,
+  create_prevout
+} from '@scrow/tapscript/tx'
 
 import {
   parse_args,
@@ -62,10 +66,13 @@ export class CoreClient {
 
     this.params = [
       `-chain=${opt.network}`,
-      `-rpcport=${opt.rpc_port}`,
       ...opt.params,
       ...opt.cli_params
     ]
+
+    if (opt.rpc_port !== undefined) {
+      this.params.push(`-rpcport=${opt.rpc_port}`)
+    }
 
     if (opt.confpath !== undefined) {
       this.params.push(`-conf=${opt.confpath}`)
@@ -210,24 +217,20 @@ export class CoreClient {
     })
   }
 
-  async find_utxo (txid : string, vout : number) {
+  async get_txout_status (txid : string, vout : number) {
     const txout = await this.get_txout(txid, vout)
-    console.log('txout:', txout)
     if (txout === null) return null
     const address = txout.scriptPubKey?.address
     if (address === undefined) return null
+    if (txout.confirmations === 0) {
+      return { spent : false }
+    }
     const utxos = await this.get_utxos({ address })
       let utxo  = utxos.find(e => e.txid === txid && e.vout === vout)
     if (utxo === undefined) {
-      const { value, scriptPubKey : script, coinbase } = txout
-      const desc   = `addr(${script.address})`
-      const height = (await this.blocks) - txout.confirmations
-      const scriptPubKey = script.hex
-      utxo = { amount : value, txid, vout, desc, height, coinbase, scriptPubKey }
       return { spent : true }
     } else {
-      utxo.amount = convert_value(utxo.amount)
-      return { spent : false, utxo }
+      return { spent : false }
     }
   }
 

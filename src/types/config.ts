@@ -9,8 +9,8 @@ export interface CoreConfig {
   debug       : boolean
   isolated    : boolean
   network     : string
-  peer_port   : number
-  rpc_port    : number
+  peer_port  ?: number
+  rpc_port   ?: number
   timeout     : number
   use_faucet  : boolean
   verbose     : boolean

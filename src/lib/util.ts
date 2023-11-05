@@ -24,7 +24,7 @@ export async function ensure_file(filepath : string) {
 }
 
 export function convert_value (value : number) {
-  return value * 100_000_000
+  return Math.round(value * 100_000_000)
 }
 
 export function convert_vout (vout : TxOutput[]) {
