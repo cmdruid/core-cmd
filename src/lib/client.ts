@@ -62,14 +62,6 @@ export class CoreClient {
 
     const { debug } = opt
 
-    if (opt.network === 'bitcoin') {
-      opt.network = 'main'
-    }
-
-    if (opt.network === 'testnet') {
-      opt.network = 'test'
-    }
-
     this._cache = [ 'null', null ]
 
     this.params = [

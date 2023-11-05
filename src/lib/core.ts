@@ -48,6 +48,14 @@ export class CoreDaemon extends EventEmitter {
       opt.rpc_port  = port + 1
     }
 
+    if (opt.network === 'bitcoin') {
+      opt.network = 'main'
+    }
+
+    if (opt.network === 'testnet') {
+      opt.network = 'test'
+    }
+
     this._client  = new CoreClient(this, opt)
     this._closing = false
     this._faucet  = null
