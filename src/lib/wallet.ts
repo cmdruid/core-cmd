@@ -203,12 +203,10 @@ export class CoreWallet {
   async ensure_funds (
     min_bal : number
   ) : Promise<void> {
-    if (this.network === 'regtest') {
-      const bal = await this.balance
-      if (bal <= min_bal) {
-        await this.drain_facuet(min_bal)
-        return this.ensure_funds(min_bal)
-      }
+    const bal = await this.balance
+    if (bal <= min_bal) {
+      await this.drain_facuet(min_bal)
+      return this.ensure_funds(min_bal)
     }
   }
 
@@ -220,7 +218,12 @@ export class CoreWallet {
       address = await this.new_address
     }
     const faucet = this.client.core.faucet
-    return faucet.send_funds(amount, address, true)
+    const balance = await faucet.balance
+    if (balance <= amount + 10000) {
+      throw new Error('faucet is broke!')
+    } else {
+      return faucet.send_funds(amount, address, true)
+    }
   }
 
   async get_xprv (label : string) {
