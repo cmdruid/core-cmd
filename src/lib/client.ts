@@ -200,7 +200,6 @@ export class CoreClient {
     vout : number
   ) {
     const res = await this.cmd<TxOutpoint | null>('gettxout', [ txid, vout ])
-    console.log('txout:', res)
     if (res === null) return null
     const value = convert_value(res.value)
     return { ...res, value }

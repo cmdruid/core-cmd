@@ -222,7 +222,7 @@ export class CoreWallet {
     if (balance <= amount + 10000) {
       throw new Error('faucet is broke!')
     } else {
-      return faucet.send_funds(amount, address, true)
+      return faucet.send_funds(amount, address)
     }
   }
 
