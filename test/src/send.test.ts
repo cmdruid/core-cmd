@@ -23,6 +23,7 @@ export default function (
 
       t.pass('Test completed with txid: ' + txid)
     } catch (err) {
+      console.log(err)
       t.fail(err)
     }
   })

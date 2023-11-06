@@ -205,12 +205,14 @@ export class CoreWallet {
   ) : Promise<void> {
     const bal = await this.balance
     if (bal <= min_bal) {
-      await this.drain_facuet(min_bal)
-      return this.ensure_funds(min_bal)
+      await this.drain_faucet(min_bal)
+      if (this.network === 'regtest') {
+        await this.client.mine_blocks(1)
+      }
     }
   }
 
-  async drain_facuet (
+  async drain_faucet (
     amount   : number,
     address ?: string
   ) : Promise<string> {
@@ -220,6 +222,8 @@ export class CoreWallet {
     const faucet = this.client.core.faucet
     const balance = await faucet.balance
     if (balance <= amount + 10000) {
+      console.log('balance:', balance)
+      console.log(await this.client.chain_info)
       throw new Error('faucet is broke!')
     } else {
       return faucet.send_funds(amount, address)

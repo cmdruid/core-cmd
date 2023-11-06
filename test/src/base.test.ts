@@ -44,6 +44,7 @@ export default function (
 
       t.pass('Tests completed with txid: ' + txid)
     } catch (err) {
+      console.log(err)
       t.fail(err)
     }
   })

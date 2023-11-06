@@ -1,6 +1,6 @@
 export const DUST_LIMIT     = 1_000
 export const FALLBACK_FEE   = 5_000
-export const FAUCET_MIN_BAL = 100_000_000 * 50 * 25
+export const FAUCET_MIN_BAL = 100_000_000 * 50 * 20
 export const INIT_BLOCK_CT  = 125
 export const MIN_TX_FEE     = 1_000
 export const RATE_LIMIT     = 0

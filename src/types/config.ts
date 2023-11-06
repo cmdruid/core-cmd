@@ -12,7 +12,6 @@ export interface CoreConfig {
   peer_port  ?: number
   rpc_port   ?: number
   timeout     : number
-  use_faucet  : boolean
   verbose     : boolean
   params      : string[]
   core_params : string[]
