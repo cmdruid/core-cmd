@@ -98,7 +98,7 @@ export class CoreWallet {
   }
 
   get new_scriptkey () : Promise<ScriptWord[]> {
-    return this.new_address.then(e => parse_addr(e).script)
+    return this.new_address.then(e => parse_addr(e).asm)
   }
 
   get utxos () {
@@ -222,8 +222,6 @@ export class CoreWallet {
     const faucet = this.client.core.faucet
     const balance = await faucet.balance
     if (balance <= amount + 10000) {
-      console.log('balance:', balance)
-      console.log(await this.client.chain_info)
       throw new Error('faucet is broke!')
     } else {
       return faucet.send_funds(amount, address)
@@ -260,7 +258,7 @@ export class CoreWallet {
     }
     return {
       value : BigInt(amount),
-      scriptPubKey : parse_addr(address).script
+      scriptPubKey : parse_addr(address).asm
     }
   }
 
