@@ -134,11 +134,11 @@ export class CoreClient {
     }
     if (cache && this._cache[0] === label) {
       if (debug) console.log('[client] using cache for method:', method)
-      return this._cache[1] as T
-    } 
+      return { ...this._cache[1] as T } 
+    }
     const data  = await run_cmd<T>(clipath, witness)
     this._cache = [ label, data ]
-    return data
+    return { ...data }
   }
 
   async _get_block_data (
