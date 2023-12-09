@@ -23,6 +23,7 @@ import {
 } from '../config.js'
 
 import {
+  clone,
   convert_value,
   convert_vout
 } from './util.js'
@@ -134,11 +135,11 @@ export class CoreClient {
     }
     if (cache && this._cache[0] === label) {
       if (debug) console.log('[client] using cache for method:', method)
-      return { ...this._cache[1] as T } 
+      return clone(this._cache[1]) as T
     }
     const data  = await run_cmd<T>(clipath, witness)
     this._cache = [ label, data ]
-    return { ...data }
+    return clone(data) as T
   }
 
   async _get_block_data (
