@@ -117,7 +117,7 @@ export class CoreWallet {
   }
 
 
-  get xprv () {
+  get xprv () : Promise<string> {
     return new Promise(async res => {
       const xprvs = await this.xprvs
       const wpkh  = xprvs.find(e => e.keytype === 'wpkh')
@@ -128,7 +128,7 @@ export class CoreWallet {
     })
   }
 
-  get xpub () {
+  get xpub () : Promise<string> {
     return new Promise(async res => {
       const xpubs = await this.xpubs
       const wpkh  = xpubs.find(e => e.keytype === 'wpkh')
