@@ -116,6 +116,29 @@ export class CoreWallet {
       .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
   }
 
+
+  get xprv () {
+    return new Promise(async res => {
+      const xprvs = await this.xprvs
+      const wpkh  = xprvs.find(e => e.keytype === 'wpkh')
+      if (wpkh === undefined) {
+        throw new Error('unable to locate wpkh descriptor')
+      }
+      res(wpkh.keystr)
+    })
+  }
+
+  get xpub () {
+    return new Promise(async res => {
+      const xpubs = await this.xpubs
+      const wpkh  = xpubs.find(e => e.keytype === 'wpkh')
+      if (wpkh === undefined) {
+        throw new Error('unable to locate wpkh descriptor')
+      }
+      res(wpkh.keystr)
+    })
+  }
+
   async _create () {
     const payload = { wallet_name: this.label, ...this._config }
     const res = await this.client.cmd<WalletResponse>('createwallet', payload)
