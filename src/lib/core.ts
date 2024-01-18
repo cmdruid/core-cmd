@@ -184,11 +184,13 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async startup (params : string[] = []) {
-    const { isolated, verbose } = this.opt
+    const { existing, isolated, verbose } = this.opt
     if (isolated) {
       await this._start(params)
     } else {
-      if (await check_process('bitcoin-qt')) {
+      if (existing) {
+        if (verbose) console.log('[core]: Attempting to use an existing instance...')
+      } else if (await check_process('bitcoin-qt')) {
         if (verbose) console.log('[core]: Using existing bitcoin QT instance...')
       } else if (await check_process('bitcoind')) {
         if (verbose) console.log('[core] Using existing bitcoin daemon...')
