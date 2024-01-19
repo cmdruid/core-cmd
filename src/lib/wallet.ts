@@ -140,6 +140,18 @@ export class CoreWallet {
     })
   }
 
+  _debug (...msg : unknown[]) {
+    if (this.client.opt.debug) {
+      console.log('[wallet]', ...msg)
+    }
+  }
+
+  _log (...msg : unknown[]) {
+    if (this.client.opt.verbose) {
+      console.log('[wallet]', ...msg)
+    }
+  }
+
   async _create () {
     const payload = { wallet_name: this.label, ...this._config }
     const res = await this.client.cmd<WalletResponse>('createwallet', payload)
@@ -191,10 +203,9 @@ export class CoreWallet {
   }
 
   async get_address (label : string) : Promise<string> {
-    const { debug } = this.client.opt
     let addr = this._addrs.get(label)
     if (addr !== undefined) {
-      if (debug) console.log('[wallet] using saved address:', addr)
+      this._debug('[wallet] using saved address:', addr)
       return addr
     }
     try {

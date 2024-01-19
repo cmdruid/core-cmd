@@ -122,6 +122,18 @@ export class CoreDaemon extends EventEmitter {
     return this._ready
   }
 
+  _debug (...msg : unknown[]) {
+    if (this.opt.debug) {
+      console.log('[core]', ...msg)
+    }
+  }
+
+  _log (...msg : unknown[]) {
+    if (this.opt.verbose) {
+      console.log('[core]', ...msg)
+    }
+  }
+
   on <K extends keyof CoreEvent> (
     event : K, 
     cb    : (arg: CoreEvent[K]) => void
@@ -144,7 +156,7 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _start (params : string[] = []) {
-    const { confpath, corepath, datapath, debug, timeout } = this.opt
+    const { confpath, corepath, datapath, timeout } = this.opt
 
     if (confpath !== undefined) {
       await ensure_file(confpath)
@@ -159,11 +171,9 @@ export class CoreDaemon extends EventEmitter {
 
     params = [ ...this.params, ...params ]
 
-    if (debug) {
-      console.log('[core] exec :', exec)
-      console.log('[core] data :', datapath)
-      console.log('[core] args :', params.join(' '))
-    }
+    this._debug('exec :', exec)
+    this._debug('data :', datapath)
+    this._debug('args :', params.join(' '))
 
     this._proc = await spawn_process(exec, params, msg, timeout)
   }
@@ -173,7 +183,7 @@ export class CoreDaemon extends EventEmitter {
     const min_bal = FAUCET_MIN_BAL / SAT_MULTI
 
     if (delay > 0) {
-      console.log(`[core] init process sleeping for ${delay} seconds...`)
+      this._log(`init process sleeping for ${delay} seconds...`)
       const ms = Math.floor(delay * 1000)
       await sleep(ms)
     }
@@ -182,13 +192,13 @@ export class CoreDaemon extends EventEmitter {
       let bal     = await this.faucet.balance
     
     if (this.opt.network === 'regtest' && bal <= min_bal) {
-      console.log('[core] Faucet generating blocks...')
+      this._log('Faucet generating blocks...')
       await this.client.mine_blocks(INIT_BLOCK_CT, addr)
       bal = await this.faucet.balance
     }
 
-    console.log('[core] Faucet address:', addr)
-    console.log('[core] Faucet balance:', bal)
+    this._log('Faucet address:', addr)
+    this._log('Faucet balance:', bal)
     
     if (bal <= min_bal) {
       throw new Error('faucet is broke!')
@@ -198,23 +208,18 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async startup (params : string[] = []) {
-    const { isolated, spawn, verbose } = this.opt
-    if (isolated) {
-      await this._start(params)
-    } else {
-      if (spawn) {
-         if (verbose && await check_process('bitcoin-qt')) {
-            console.log('[core] Existing bitcoin-qt process running...')
-         }
-         if (await check_process('bitcoind')) {
-           if (verbose) console.log('[core] Using existing bitcoin daemon process...')
-         } else {
-           if (verbose) console.log('[core] Starting new bitcoin daemon...')
-           await this._start(params)
-         }
-      } else {
-         if (verbose) console.log('[core]: Using existing bitcoin core process...')
+    const { isolated, spawn } = this.opt
+    if (!isolated) {
+      if (await check_process('bitcoin-qt')) {
+        this._log('Existing bitcoin-qt process detected...')
       }
+      if (await check_process('bitcoind')) {
+        this._log('Existing bitcoin daemon process detected...')
+      }
+    }
+    if (spawn) {
+      this._log('Starting new bitcoin daemon...')
+      await this._start(params)
     }
     await this._init()
     this._ready = true

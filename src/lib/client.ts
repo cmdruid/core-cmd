@@ -119,6 +119,18 @@ export class CoreClient {
       .then(e => e.wallets.map(x => x.name))
   }
 
+  _debug (...msg : unknown[]) {
+    if (this.opt.debug) {
+      console.log('[client]', ...msg)
+    }
+  }
+
+  _log (...msg : unknown[]) {
+    if (this.opt.verbose) {
+      console.log('[client]', ...msg)
+    }
+  }
+
   async cmd <T = Record<string, string>> (
     method  : string,
     args   ?: MethodArgs,
@@ -131,10 +143,10 @@ export class CoreClient {
     const label   = witness.join('')
     if (debug) {
       const offset = this.params.length
-      console.log('[client] cmd:', witness.slice(offset).join(' '))
+      this._debug('cmd:', witness.slice(offset).join(' '))
     }
     if (cache && this._cache[0] === label) {
-      if (debug) console.log('[client] using cache for method:', method)
+      this._debug('using cache for method:', method)
       return clone(this._cache[1]) as T
     }
     const data  = await run_cmd<T>(clipath, witness)
