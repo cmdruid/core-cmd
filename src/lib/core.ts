@@ -169,12 +169,14 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _init () {
-    if (this.opt.init_delay > 0) {
-      const ms = Math.floor(this.opt.init_delay * 1000)
+    const delay   = this.opt.init_delay
+    const min_bal = FAUCET_MIN_BAL / SAT_MULTI
+
+    if (delay > 0) {
+      console.log(`[core] init process sleeping for ${delay} seconds...`)
+      const ms = Math.floor(delay * 1000)
       await sleep(ms)
     }
-
-    const min_bal = FAUCET_MIN_BAL / SAT_MULTI
     this._faucet  = await this.client.load_wallet('faucet')
     const addr    = await this.faucet.get_address('faucet')
       let bal     = await this.faucet.balance
