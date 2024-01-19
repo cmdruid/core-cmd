@@ -188,7 +188,7 @@ export class CoreClient {
 
   async get_tx (txid : string) {
     try {
-      const res = await this.cmd<TxResult>('getrawtransaction', [ txid, 2 ], { cache : true })
+      const res = await this.cmd<TxResult>('getrawtransaction', [ txid, 2 ])
       res.vout = convert_vout(res.vout)
       return res
     } catch {

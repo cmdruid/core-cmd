@@ -190,10 +190,8 @@ export class CoreDaemon extends EventEmitter {
     if (isolated) {
       await this._start(params)
     } else {
-      if (daemon) {
+      if (!daemon) {
         if (verbose) console.log('[core]: Using existing bitcoin core process...')
-      } else if (await check_process('bitcoin-qt')) {
-        if (verbose) console.log('[core]: Using existing bitcoin QT process...')
       } else if (await check_process('bitcoind')) {
         if (verbose) console.log('[core] Using existing bitcoin daemon process...')
       } else {
