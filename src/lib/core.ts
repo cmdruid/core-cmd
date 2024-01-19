@@ -11,7 +11,8 @@ import {
 
 import {
   ensure_file,
-  ensure_path
+  ensure_path,
+  sleep
 } from './util.js'
 
 import {
@@ -168,6 +169,11 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _init () {
+    if (this.opt.init_delay > 0) {
+      const ms = Math.floor(this.opt.init_delay * 1000)
+      await sleep(ms)
+    }
+
     const min_bal = FAUCET_MIN_BAL / SAT_MULTI
     this._faucet  = await this.client.load_wallet('faucet')
     const addr    = await this.faucet.get_address('faucet')

@@ -7,6 +7,7 @@ export interface CoreConfig {
   confpath   ?: string
   datapath   ?: string
   debug       : boolean
+  init_delay  : number
   isolated    : boolean
   network     : string
   peer_port  ?: number

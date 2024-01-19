@@ -2,6 +2,7 @@ import { CmdConfig, CoreConfig } from './types/config.js'
 
 export const CORE_DEFAULTS : CoreConfig = {
   debug       : false,
+  init_delay  : 0,
   isolated    : false,
   network     : 'regtest',
   spawn       : true,
