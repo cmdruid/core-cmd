@@ -1,13 +1,9 @@
-import EventEmitter     from 'events'
-import { ChildProcess } from 'child_process'
-import { CoreClient }   from './client.js'
-import { core_config }  from '../config.js'
-import { CoreWallet }   from './wallet.js'
-
-import {
-  check_process,
-  spawn_process
-} from './cmd.js'
+import EventEmitter      from 'events'
+import { ChildProcess }  from 'child_process'
+import { CoreClient }    from './client.js'
+import { core_config }   from '../config.js'
+import { CoreWallet }    from './wallet.js'
+import { check_process, spawn_process } from './cmd.js'
 
 import {
   ensure_file,
@@ -41,7 +37,7 @@ export class CoreDaemon extends EventEmitter {
 
     const opt = core_config(config)
 
-    const { isolated, spawn } = opt
+    const { isolated, safemode } = opt
 
     if (isolated) {
       const port = RANDOM_PORT()
@@ -86,7 +82,7 @@ export class CoreDaemon extends EventEmitter {
       this.params.push(`-datadir=${opt.datapath}`)
     }
 
-    if (spawn) {
+    if (safemode) {
       process.once('uncaughtException', async (err) => {
         console.log('[core] Daemon caught an error, exiting...')
         console.dir(err, { depth: null })
@@ -187,6 +183,7 @@ export class CoreDaemon extends EventEmitter {
       const ms = Math.floor(delay * 1000)
       await sleep(ms)
     }
+
     this._faucet  = await this.client.load_wallet('faucet')
     const addr    = await this.faucet.get_address('faucet')
       let bal     = await this.faucet.balance
@@ -209,18 +206,18 @@ export class CoreDaemon extends EventEmitter {
 
   async startup (params : string[] = []) {
     const { isolated, spawn } = this.opt
-    if (!isolated) {
-      if (await check_process('bitcoin-qt')) {
-        this._log('Existing bitcoin-qt process detected...')
-      }
-      if (await check_process('bitcoind')) {
-        this._log('Existing bitcoin daemon process detected...')
-      }
-    }
-    if (spawn) {
+
+    const has_daemon  = await check_process('bitcoind')
+    const has_client  = await check_process('bitcoin-qt')
+    const no_proccess = (!has_client && !has_daemon)
+
+    if (isolated || spawn || no_proccess) {
       this._log('Starting new bitcoin daemon...')
       await this._start(params)
+    } else {
+      this._log('Using existing bitcoin process...')
     }
+
     await this._init()
     this._ready = true
     this.emit('ready', this.client)

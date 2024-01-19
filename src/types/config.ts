@@ -12,6 +12,7 @@ export interface CoreConfig {
   network     : string
   peer_port  ?: number
   rpc_port   ?: number
+  safemode    : boolean
   spawn       : boolean
   timeout     : number
   verbose     : boolean
