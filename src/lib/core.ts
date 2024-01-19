@@ -168,16 +168,16 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async _init () {
-    const debug   = this.opt.debug
     const min_bal = FAUCET_MIN_BAL / SAT_MULTI
     this._faucet  = await this.client.load_wallet('faucet')
     const addr    = await this.faucet.get_address('faucet')
       let bal     = await this.faucet.balance
     if (this.opt.network === 'regtest') {
-      while (bal <= min_bal) {
-        if (debug) console.log('[core] Faucet generating blocks. Balance:', bal)
+     if (bal <= min_bal) {
+        console.log('[core] Faucet generating blocks...')
         await this.client.mine_blocks(INIT_BLOCK_CT, addr)
         bal = await this.faucet.balance
+        console.log('[core] Faucet balance:', bal)
       }
     } else if (bal <= min_bal) {
       throw new Error('faucet is broke!')

@@ -194,7 +194,7 @@ export class CoreWallet {
     const { debug } = this.client.opt
     let addr = this._addrs.get(label)
     if (addr !== undefined) {
-      if (debug) console.log('[wallet] using cached address:', addr)
+      if (debug) console.log('[wallet] using saved address:', addr)
       return addr
     }
     try {

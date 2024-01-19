@@ -1,9 +1,9 @@
 import { CoreDaemon } from '../src/index.js'
 
 const core = new CoreDaemon({
-  daemon  : false,
   network : 'signet',
-  debug   : true
+  debug   : true,
+  spawn   : false
 })
 
 await core.run(async (client) => { 
