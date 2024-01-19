@@ -6,8 +6,8 @@ export interface CoreConfig {
   clipath    ?: string
   confpath   ?: string
   datapath   ?: string
+  daemon      : boolean
   debug       : boolean
-  existing    : boolean
   isolated    : boolean
   network     : string
   peer_port  ?: number

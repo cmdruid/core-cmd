@@ -40,7 +40,7 @@ export class CoreDaemon extends EventEmitter {
 
     const opt = core_config(config)
 
-    const { isolated } = opt
+    const { daemon, isolated } = opt
 
     if (isolated) {
       const port = RANDOM_PORT()
@@ -85,17 +85,19 @@ export class CoreDaemon extends EventEmitter {
       this.params.push(`-datadir=${opt.datapath}`)
     }
 
-    process.once('uncaughtException', async (err) => {
-      console.log('[core] Daemon caught an error, exiting...')
-      console.dir(err, { depth: null })
-      await this.shutdown()
-    })
+    if (daemon) {
+      process.once('uncaughtException', async (err) => {
+        console.log('[core] Daemon caught an error, exiting...')
+        console.dir(err, { depth: null })
+        await this.shutdown()
+      })
 
-    process.once('unhandledRejection', async (err) => {
-      console.log('[core] Daemon caught a promise rejection, exiting...')
-      console.dir(err, { depth: null })
-      await this.shutdown()
-    })
+      process.once('unhandledRejection', async (err) => {
+        console.log('[core] Daemon caught a promise rejection, exiting...')
+        console.dir(err, { depth: null })
+        await this.shutdown()
+      })
+    }
 
     this._opt = opt
   }
@@ -184,16 +186,16 @@ export class CoreDaemon extends EventEmitter {
   }
 
   async startup (params : string[] = []) {
-    const { existing, isolated, verbose } = this.opt
+    const { daemon, isolated, verbose } = this.opt
     if (isolated) {
       await this._start(params)
     } else {
-      if (existing) {
-        if (verbose) console.log('[core]: Attempting to use an existing instance...')
+      if (daemon) {
+        if (verbose) console.log('[core]: Using existing bitcoin core process...')
       } else if (await check_process('bitcoin-qt')) {
-        if (verbose) console.log('[core]: Using existing bitcoin QT instance...')
+        if (verbose) console.log('[core]: Using existing bitcoin QT process...')
       } else if (await check_process('bitcoind')) {
-        if (verbose) console.log('[core] Using existing bitcoin daemon...')
+        if (verbose) console.log('[core] Using existing bitcoin daemon process...')
       } else {
         if (verbose) console.log('[core] Starting new bitcoin daemon...')
         await this._start(params)

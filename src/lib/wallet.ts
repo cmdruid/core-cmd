@@ -1,8 +1,9 @@
-import assert         from 'assert'
 import { derive_key } from '@cmdcode/crypto-tools/hd'
 import { parse_addr } from '@scrow/tapscript/address'
 import { CoreClient } from './client.js'
 import { cmd_config } from '../config.js'
+
+import * as assert from '../assert.js'
 
 import {
   ScriptWord,
