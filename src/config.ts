@@ -1,10 +1,10 @@
 import { CmdConfig, CoreConfig } from './types/config.js'
 
 export const CORE_DEFAULTS : CoreConfig = {
-  daemon      : true,
   debug       : false,
   isolated    : false,
   network     : 'regtest',
+  spawn       : true,
   timeout     : 5000,
   verbose     : true,
   params      : [],

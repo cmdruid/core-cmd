@@ -6,12 +6,12 @@ export interface CoreConfig {
   clipath    ?: string
   confpath   ?: string
   datapath   ?: string
-  daemon      : boolean
   debug       : boolean
   isolated    : boolean
   network     : string
   peer_port  ?: number
   rpc_port   ?: number
+  spawn       : boolean
   timeout     : number
   verbose     : boolean
   params      : string[]
