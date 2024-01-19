@@ -228,7 +228,7 @@ export class CoreWallet {
     min_bal : number
   ) : Promise<void> {
     const bal = await this.balance
-    if (bal <= min_bal) {
+    if (bal <= min_bal && this.label !== 'faucet') {
       await this.drain_faucet(min_bal)
       if (this.network === 'regtest') {
         await this.client.mine_blocks(1)
