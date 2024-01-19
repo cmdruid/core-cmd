@@ -207,11 +207,11 @@ export class CoreDaemon extends EventEmitter {
   async startup (params : string[] = []) {
     const { isolated, spawn } = this.opt
 
-    const has_daemon  = await check_process('bitcoind')
-    const has_client  = await check_process('bitcoin-qt')
-    const no_proccess = (!has_client && !has_daemon)
+    const has_daemon = await check_process('bitcoind')
+    const has_client = await check_process('bitcoin-qt')
+    const no_process = (!has_client && !has_daemon)
 
-    if (isolated || spawn || no_proccess) {
+    if (isolated || spawn || no_process) {
       this._log('Starting new bitcoin daemon...')
       await this._start(params)
     } else {
