@@ -61,8 +61,6 @@ export class CoreClient {
   ) {
     const opt = core_config(config)
 
-    const { debug } = opt
-
     this._cache = [ 'null', null ]
 
     this.params = [
@@ -70,6 +68,14 @@ export class CoreClient {
       ...opt.params,
       ...opt.cli_params
     ]
+
+    if (opt.rpc_user !== undefined) {
+      this.params.push(`-rpcuser=${opt.rpc_user}`)
+    }
+
+    if (opt.rpc_pass !== undefined) {
+      this.params.push(`-rpcpassword=${opt.rpc_pass}`)
+    }
 
     if (opt.rpc_port !== undefined) {
       this.params.push(`-rpcport=${opt.rpc_port}`)
@@ -91,7 +97,7 @@ export class CoreClient {
     this._core   = core
     this._faucet = null
 
-    if (debug) console.log('[debug] Initializing CLI with params:', this.params.join(' '))
+    this._debug('[client] Initializing with params:', this.params.join(' '))
   }
 
   get opt () : CoreConfig {
