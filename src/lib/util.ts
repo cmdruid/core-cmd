@@ -4,6 +4,10 @@ import { TxOutput } from '../types/index.js'
 
 export const sleep = (ms = 1000) => new Promise(res => setTimeout(res, ms))
 
+export function now () {
+  return Math.floor(Date.now() / 1000)
+}
+
 export async function path_exists (filepath : string) {
   try {
     await access(filepath, constants.R_OK | constants.W_OK)

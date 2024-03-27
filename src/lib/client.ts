@@ -25,7 +25,8 @@ import {
 import {
   clone,
   convert_value,
-  convert_vout
+  convert_vout,
+  now
 } from './util.js'
 
 import {
@@ -309,6 +310,14 @@ export class CoreClient {
     const txid  = await this.cmd<string>('sendrawtransaction', [ txhex ])
     if (confirm) await this.mine_blocks(1)
     return txid
+  }
+
+  async set_time (timestamp ?: number) {
+    if (this.opt.network !== 'regtest') {
+      throw new Error('You can only manipulate time on regtest network!')
+    }
+    const ts = timestamp ?? now()
+    await this.cmd<string>('setmocktime', [ ts ])
   }
 }
 
