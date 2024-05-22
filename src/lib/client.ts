@@ -215,6 +215,13 @@ export class CoreClient {
     }
   }
 
+  async get_tx_status (txid : string) : Promise<TxStatus | null> {
+    const tx = await this.get_tx(txid)
+    if (tx === null) return null
+    const blocks = await this.blocks
+    return get_tx_status(blocks, tx)
+  }
+
   async get_txout (
     txid : string, 
     vout : number
@@ -259,17 +266,9 @@ export class CoreClient {
     const txout = tx.vout.at(vout)
     if (txout === undefined) return null
 
-    let status : TxStatus
-
-    if (tx.confirmations !== undefined && tx.confirmations > 0) {
-      const block_hash   = tx.blockhash as string
-      const block_time   = tx.blocktime as number
-      const block_height = (await this.blocks) - tx.confirmations
-      status = { confirmed : true, block_height, block_hash, block_time }
-    } else {
-      status = { confirmed : false }
-    }
-
+    const blocks = await this.blocks
+    const status = get_tx_status(blocks, tx)
+    
     const { value, scriptPubKey } = txout
     const script  = parse_script(scriptPubKey.hex)
     const prevout = { value, scriptPubKey : script.asm }
@@ -330,4 +329,18 @@ function get_scan_desc (opt : ScanOptions) {
     return `raw(${opt.script})`
   }
   throw new Error('No scan option specified!')
+}
+
+function get_tx_status (
+  blocks : number,
+  tx     : TxResult
+) : TxStatus {
+  if (tx.confirmations !== undefined && tx.confirmations > 0) {
+    const block_hash   = tx.blockhash as string
+    const block_time   = tx.blocktime as number
+    const block_height = blocks - tx.confirmations
+    return { confirmed : true, block_height, block_hash, block_time }
+  } else {
+    return { confirmed : false }
+  }
 }
