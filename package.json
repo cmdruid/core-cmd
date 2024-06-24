@@ -1,6 +1,6 @@
 {
   "name": "@cmdcode/core-cmd",
-  "version": "1.5.5",
+  "version": "1.5.6",
   "description": "Command Bitcoin Core using a suite of automation tools.",
   "author": "Christopher Scott",
   "license": "MIT",
@@ -37,6 +37,7 @@
     "test": "tsx test/tape.ts"
   },
   "dependencies": {
+    "@cmdcode/buff": "^2.2.5",
     "@cmdcode/crypto-tools": "^2.7.6",
     "@cmdcode/psbt2": "^0.0.8",
     "@scrow/tapscript": "^2.2.2",
