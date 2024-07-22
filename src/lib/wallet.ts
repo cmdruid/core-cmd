@@ -1,9 +1,9 @@
 import { Buff }          from '@cmdcode/buff'
 import { encode_script } from '@scrow/tapscript/script'
-import { derive_key }    from '@cmdcode/crypto-tools/hd'
 import { CoreClient }    from './client.js'
 import { cmd_config }    from '../config.js'
 
+import { derive_key, parse_extkey } from '@cmdcode/crypto-tools/hd'
 import { P2TR, P2WPKH, parse_addr } from '@scrow/tapscript/address'
 import { Transaction, bip32Path }   from '@scure/btc-signer'
 
@@ -256,14 +256,16 @@ export class CoreWallet {
     const desc   = parse_descriptor(data.desc)
     const pubkey = desc.keystr
     const xprvs  = await this.xprvs
-    const xprv   = xprvs.find(e => e.parent_label === desc.parent_label)
+    const xprv   = xprvs.find(e => e.label === desc.parent_label)
     assert.exists(xprv)
+    const seckey = parse_extkey(xprv.keystr).seckey
+    assert.exists(seckey)
     return {
       pubkey,
+      seckey,
       desc   : data.desc,
-      mprint : xprv.parent_label,
-      path   : xprv.fullpath,
-      seckey : xprv.keystr
+      mprint : data.hdmasterfingerprint,
+      path   : desc.fullpath
     }
   }
 
