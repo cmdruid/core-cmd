@@ -1,11 +1,26 @@
-import { derive_key } from '@cmdcode/crypto-tools/hd'
-import { parse_addr } from '@scrow/tapscript/address'
-import { CoreClient } from './client.js'
-import { cmd_config } from '../config.js'
+import { Buff }          from '@cmdcode/buff'
+import { encode_script } from '@scrow/tapscript/script'
+import { derive_key }    from '@cmdcode/crypto-tools/hd'
+import { CoreClient }    from './client.js'
+import { cmd_config }    from '../config.js'
+
+import { P2TR, P2WPKH, parse_addr } from '@scrow/tapscript/address'
+import { Transaction, bip32Path }   from '@scure/btc-signer'
+
+import {
+  encode_tapscript,
+  get_taptweak,
+  tweak_pubkey
+} from '@scrow/tapscript/tapkey'
 
 import * as assert from '../assert.js'
 
+const TXIN_SIZE = 41 // 32 + 4 + 4 + 1
+const WIT_VSIZE = 26 // Math.ceil((66 + 34 + 1) / 4)
+const TXO_SIZE  = 30 // 8 + 1 + 1 + 20
+
 import {
+  Network,
   ScriptWord,
   SigHashOptions,
   TxData,
@@ -19,18 +34,21 @@ import {
 
 import {
   create_tx,
-  create_vin
+  create_vin,
+  decode_tx
 } from '@scrow/tapscript/tx'
 
 import {
-  parse_desc,
-  parse_descriptor
+  parse_descriptor,
+  parse_desc_item
 } from './descriptors.js'
 
 import {
   AddressConfig,
   AddressInfo,
   CmdConfig,
+  DescriptorKeyPair,
+  FundingOptions,
   MethodArgs,
   UTXO,
   WalletConfig,
@@ -109,12 +127,12 @@ export class CoreWallet {
 
   get xprvs () {
     return this.cmd<WalletDescriptors>('listdescriptors', true, { cache : true })
-      .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
+      .then(({ descriptors }) => descriptors.map(x => parse_desc_item(x)))
   }
 
   get xpubs () {
     return this.cmd<WalletDescriptors>('listdescriptors', null, { cache : true })
-      .then(({ descriptors }) => descriptors.map(x => parse_descriptor(x)))
+      .then(({ descriptors }) => descriptors.map(x => parse_desc_item(x)))
   }
 
 
@@ -223,6 +241,37 @@ export class CoreWallet {
     return this.cmd<AddressInfo>('getaddressinfo', address, { cache : true })
   }
 
+  async get_pubkey (address : string) : Promise<string> {
+    const desc = await this.parse_address(address)
+    return parse_descriptor(desc.desc).keystr
+  }
+
+  async gen_pubkey (address_type = 'bech32') : Promise<string> {
+    const address = await this.gen_address({ address_type })
+    return this.get_pubkey(address)
+  }
+
+  async get_descriptor (address : string) : Promise<DescriptorKeyPair> {
+    const data   = await this.parse_address(address)
+    const desc   = parse_descriptor(data.desc)
+    const pubkey = desc.keystr
+    const xprvs  = await this.xprvs
+    const xprv   = xprvs.find(e => e.parent_label === desc.parent_label)
+    assert.exists(xprv)
+    return {
+      pubkey,
+      desc   : data.desc,
+      mprint : xprv.parent_label,
+      path   : xprv.fullpath,
+      seckey : xprv.keystr
+    }
+  }
+
+  async gen_descriptor (address_type : string) : Promise<DescriptorKeyPair> {
+    const address = await this.gen_address({ address_type })
+    return this.get_descriptor(address)
+  }
+
   async send_funds (
     amount  : number,
     address : string,
@@ -271,7 +320,7 @@ export class CoreWallet {
   async get_signer (
     desc : string
   ) {
-    const { parent_label, fullpath, keytype } = parse_desc(desc)
+    const { parent_label, fullpath, keytype } = parse_descriptor(desc)
     const xprv = await this.get_xprv(parent_label)
     assert.ok(xprv?.extkey?.seckey !== undefined)
     const { seckey: master_key, code } = xprv.extkey
@@ -323,11 +372,11 @@ export class CoreWallet {
   }
 
   async fund_tx (
-    templ  : TxTemplate,
-    config : SigHashOptions = {},
-    txfee  : number = 1000
+    template : TxTemplate,
+    config   : SigHashOptions = {},
+    txfee    : number = 1000
   ) {
-    const txdata = create_tx(templ)
+    const txdata = create_tx(template)
     const vamt   = txdata.vout.reduce((prev, curr) => Number(curr.value) + prev, 0)
     const utxos  = await this.select_utxos(vamt + txfee)
     const total  = utxos.reduce((prev, curr) => curr.sats + prev, 0)
@@ -351,5 +400,133 @@ export class CoreWallet {
       txdata.vin.push({ ...txinput, witness })
     }
     return txdata
+  }
+
+  async add_segwit_desc (
+    psbt   : string,
+    pubkey : string,
+    index  : number
+  ) {
+    const addr  = P2WPKH.create(pubkey, this.network as Network)
+    const desc  = await this.parse_address(addr)
+    const pdata = Transaction.fromPSBT(Buff.base64(psbt))
+    const der   = {
+      fingerprint : Buff.hex(desc.hdmasterfingerprint).num,
+      path        : bip32Path(desc.hdkeypath.replace(/h/g, '\''))
+    }
+    pdata.updateInput(index, { bip32Derivation : [[ new Buff(pubkey), der ]] })
+    return new Buff(pdata.toPSBT(0)).base64
+  }
+
+  async add_taproot_desc (
+    psbt    : string,
+    pubkey  : string,
+    index   : number,
+    scripts : string[] = [],
+    version = 0xc0
+  ) {
+    const tweak  = get_taptweak(pubkey)
+    const tapkey = tweak_pubkey(pubkey, tweak).slice(1)
+    const addr   = P2TR.create(tapkey, this.network as Network)
+    const desc   = await this.parse_address(addr)
+    const pdata  = Transaction.fromPSBT(Buff.base64(psbt))
+    const hashes = scripts.map(e => Buff.hex(encode_tapscript(e, version)))
+    const der    = {
+      fingerprint : Buff.hex(desc.hdmasterfingerprint).num,
+      path        : bip32Path(desc.hdkeypath.replace(/h/g, '\''))
+    }
+    pdata.updateInput(index, { tapBip32Derivation : [[ new Buff(pubkey), { hashes, der } ]] })
+    return new Buff(pdata.toPSBT(0)).base64
+  }
+
+  async fund_psbt (
+    psbt    : string,
+    options : FundingOptions = {}
+  ) : Promise<string> {
+    const pdata  = Transaction.fromPSBT(Buff.base64(psbt))
+    const txdata = decode_tx(pdata.unsignedTx, false)
+
+    let { amount, feerate = 1, vsize = pdata.vsize } = options
+
+    if (amount === undefined) {
+      const txin_amt = txdata.vin.reduce((p, n) => {
+      return (n.prevout !== undefined)
+        ? p + n.prevout.value
+        : p + 0n
+      }, 0n)
+
+      const txout_amt = txdata.vout.reduce((p, n) => {
+        return p + n.value
+      }, 0n)
+      
+      amount = Number(txout_amt - txin_amt)
+    }
+
+    const utxos  = await this.select_utxos(amount)
+    const total  = utxos.reduce((prev, curr) => curr.sats + prev, 0)
+    const tsize  = vsize + (utxos.length * (TXIN_SIZE + WIT_VSIZE)) + TXO_SIZE
+    const txfees = tsize * feerate
+    const change = BigInt(total - (amount + txfees))
+    const script = await this.new_scriptkey
+
+    pdata.addOutput({
+      amount : change,
+      script : encode_script(script, false)
+    })
+
+    for (let i = 0; i < utxos.length; i++) {
+      const { desc, txid, vout, sats, scriptPubKey } = utxos[i]
+
+      const vin_idx = i + pdata.inputsLength
+
+      pdata.addInput({
+        txid,
+        index           : vout,
+        witnessUtxo     : { amount : BigInt(sats), script : new Buff(scriptPubKey) },
+        // sighashType     : 0x81
+      })
+
+      const d      = parse_descriptor(desc)
+      const pubkey = (d.extkey !== undefined) ? d.extkey.pubkey : d.keystr
+
+      if (d.keytype === 'wpkh') {
+        assert.size(pubkey, 33)
+        pdata.updateInput(vin_idx, {
+          bip32Derivation : [
+            [
+              new Buff(pubkey),
+              { fingerprint: Buff.hex(d.parent_label).num, path: bip32Path('m' + d.fullpath) }
+            ]
+          ]
+        })
+      } else if (d.keytype === 'tr') {
+        assert.size(pubkey, 32)
+        pdata.updateInput(vin_idx, {
+          tapBip32Derivation : [
+            [
+              new Buff(pubkey),
+              {
+                hashes : [],
+                der    : {
+                  fingerprint : Buff.hex(d.parent_label).num,
+                  path        : bip32Path('m' + d.fullpath)
+                }
+              }
+            ]
+          ]
+        })
+      } else {
+        throw new Error('unknown key type: ' + d.keytype)
+      }
+    }
+
+    return new Buff(pdata.toPSBT(0)).base64
+  }
+
+  async sign_psbt (
+    psbt : string,
+  ) : Promise<string> {
+    const ret = await this.cmd('walletprocesspsbt', [ psbt, true ])
+    return ret['psbt']
   }
 }

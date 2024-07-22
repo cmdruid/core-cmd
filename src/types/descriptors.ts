@@ -12,6 +12,7 @@ export interface DescriptorItem {
 }
 
 export interface DescriptorMeta {
+  descriptor   : string
   extkey      ?: ExtKey
   keystr       : string
   is_extended  : boolean
@@ -24,7 +25,16 @@ export interface DescriptorMeta {
   label        : string
   keytype      : string
   purpose      : number
-  cointype     : number
+  network      : number
   account      : number
-  sub          : number
+  cointype     : number
+  index        : number
+}
+
+export interface DescriptorKeyPair {
+  desc   : string
+  mprint : string
+  path   : string
+  pubkey : string
+  seckey : string
 }

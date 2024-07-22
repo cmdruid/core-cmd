@@ -62,7 +62,7 @@ export function spawn_process (
   cmdpath  : string,
   params   : string[],
   init_msg : string,
-  timeout  = 5_000
+  timeout  = 10_000
 ) : Promise<ChildProcess> {
   return new Promise((res, rej) => {
     let   init = false

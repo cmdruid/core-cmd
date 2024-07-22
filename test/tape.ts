@@ -11,6 +11,7 @@ export const core = new CoreDaemon({
   datapath : 'test/data',
   debug    : true,
   isolated : true,
+  verbose  : true,
   network  : 'regtest'
 })
 

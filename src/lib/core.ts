@@ -163,7 +163,7 @@ export class CoreDaemon extends EventEmitter {
     }
 
     const exec = corepath ?? 'bitcoind'
-    const msg  = 'loadblk thread exit'
+    const msg  = 'init message: Done loading'
 
     params = [ ...this.params, ...params ]
 

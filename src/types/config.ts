@@ -25,7 +25,7 @@ export interface CoreConfig {
 
 export interface AddressConfig {
   label ?: string
-  type  ?: 'legacy' | 'p2sh-segwit' | 'bech32' | string
+  address_type ?: 'legacy' | 'p2sh-segwit' | 'bech32' | 'bech32m' | string
 }
 
 export interface CmdConfig {

@@ -59,3 +59,9 @@ export interface UTXO {
   safe          : boolean,
   sats          : number
 }
+
+export interface FundingOptions {
+  amount  ?: number
+  feerate ?: number
+  vsize   ?: number
+}

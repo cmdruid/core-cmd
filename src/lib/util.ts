@@ -72,3 +72,22 @@ export function clone <T> (data : T) {
   
   throw new TypeError('Content type not supported: ' + typeof data)
 }
+
+export function is_uint (
+  value : unknown,
+  max_val = Number.MAX_SAFE_INTEGER
+) : value is number {
+  if (typeof value === 'string') {
+    value = Number(value)
+  }
+  if (typeof value !== 'number') {
+    return false
+  }
+  return (
+    typeof value === 'number' &&
+    !isNaN(value)             &&
+    value >= 0                &&
+    value <= max_val          &&
+    Math.floor(value) === value
+  )
+}
