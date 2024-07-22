@@ -2,6 +2,7 @@ import { Buff }          from '@cmdcode/buff'
 import { encode_script } from '@scrow/tapscript/script'
 import { CoreClient }    from './client.js'
 import { cmd_config }    from '../config.js'
+import { get_pubkey }    from '@cmdcode/crypto-tools/keys'
 
 import { derive_key, parse_extkey } from '@cmdcode/crypto-tools/hd'
 import { P2TR, P2WPKH, parse_addr } from '@scrow/tapscript/address'
@@ -12,12 +13,6 @@ import {
   get_taptweak,
   tweak_pubkey
 } from '@scrow/tapscript/tapkey'
-
-import * as assert from '../assert.js'
-
-const TXIN_SIZE = 41 // 32 + 4 + 4 + 1
-const WIT_VSIZE = 26 // Math.ceil((66 + 34 + 1) / 4)
-const TXO_SIZE  = 30 // 8 + 1 + 1 + 20
 
 import {
   Network,
@@ -57,7 +52,12 @@ import {
   WalletResponse
 } from '../types/index.js'
 
-import * as CONST from './const.js'
+import * as assert from '../assert.js'
+import * as CONST  from './const.js'
+
+const TXIN_SIZE = 41 // 32 + 4 + 4 + 1
+const WIT_VSIZE = 26 // Math.ceil((66 + 34 + 1) / 4)
+const TXO_SIZE  = 30 // 8 + 1 + 1 + 20
 
 const { DUST_LIMIT, MIN_TX_FEE, SAT_MULTI, RANDOM_SORT } = CONST
 
@@ -254,12 +254,12 @@ export class CoreWallet {
   async get_descriptor (address : string) : Promise<DescriptorKeyPair> {
     const data   = await this.parse_address(address)
     const desc   = parse_descriptor(data.desc)
-    const pubkey = desc.keystr
     const xprvs  = await this.xprvs
     const xprv   = xprvs.find(e => e.label === desc.parent_label)
     assert.exists(xprv)
     const seckey = parse_extkey(xprv.keystr).seckey
     assert.exists(seckey)
+    const pubkey = get_pubkey(seckey, desc.keytype.includes('tr')).hex
     return {
       pubkey,
       seckey,
