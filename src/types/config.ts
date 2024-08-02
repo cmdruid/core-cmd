@@ -15,8 +15,9 @@ export interface CoreConfig {
   rpc_user   ?: string
   rpc_pass   ?: string
   safemode    : boolean
-  spawn       : boolean
+  no_spawn    : boolean
   timeout     : number
+  use_cache   : boolean
   verbose     : boolean
   params      : string[]
   core_params : string[]

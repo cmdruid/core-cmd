@@ -105,7 +105,7 @@ export class CoreWallet {
 
   get balance () {
     return this.cmd<string>('getbalance', null, { cache : true })
-      .then(bal => Number(bal) * SAT_MULTI)
+      .then(bal => Math.floor(Number(bal) * SAT_MULTI))
   }
 
   get network () {
@@ -121,7 +121,7 @@ export class CoreWallet {
   }
 
   get utxos () {
-    return this.cmd<UTXO[]>('listunspent', null, { cache : true })
+    return this.cmd<UTXO[]>('listunspent', 0, { cache : true })
       .then(e => e.map(x => { return { ...x, sats : Math.round(x.amount * SAT_MULTI) }}))
   }
 
@@ -308,10 +308,15 @@ export class CoreWallet {
     const faucet = this.client.core.faucet
     const balance = await faucet.balance
     if (balance <= amount + 10000) {
-      throw new Error('faucet is broke!')
-    } else {
-      return faucet.send_funds(amount, address)
+      if (this.network !== 'regtest') {
+        throw new Error('faucet is broke!')
+      } else {
+        const mine_addr = await faucet.get_address('faucet')
+        await this.client.mine_blocks(100, mine_addr)
+      }
     }
+
+    return faucet.send_funds(amount, address, true)
   }
 
   async get_xprv (label : string) {

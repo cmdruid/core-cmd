@@ -143,7 +143,7 @@ export class CoreClient {
     args   ?: MethodArgs,
     config ?: Partial<CmdConfig>
   ) : Promise<T> {
-    const { clipath = 'bitcoin-cli', debug } = this.opt
+    const { clipath = 'bitcoin-cli', debug, use_cache } = this.opt
     const { cache, params } = cmd_config(config)
     const parsed  = parse_args(method, args)
     const witness = [ ...this.params, ...params, ...parsed ]
@@ -152,7 +152,7 @@ export class CoreClient {
       const offset = this.params.length
       this._debug('cmd:', witness.slice(offset).join(' '))
     }
-    if (cache && this._cache[0] === label) {
+    if (cache && use_cache && this._cache[0] === label) {
       this._debug('using cache for method:', method)
       return clone(this._cache[1]) as T
     }
