@@ -19,6 +19,7 @@ import {
   ScriptWord,
   SigHashOptions,
   TxData,
+  TxInput,
   TxTemplate,
 } from '@scrow/tapscript'
 
@@ -340,17 +341,24 @@ export class CoreWallet {
     return { pubkey, sign_tx }
   }
 
-  async create_txout (
-    amount   : number | bigint,
-    address ?: string,
-  ) {
-    if (typeof address !== 'string') {
-      address = await this.new_address
-    }
-    return {
-      value : BigInt(amount),
-      scriptPubKey : parse_addr(address).asm
-    }
+  async create_utxo (
+    amount  : number,
+    address : string,
+    mine_block ?: boolean
+  ) : Promise<TxInput> {
+    const value  = BigInt(amount)
+    const script = parse_addr(address).hex
+    const txid   = await this.send_funds(amount, address, mine_block)
+    const txdata = await this.client.get_tx(txid)
+    assert.exists(txdata)
+    const vout   = txdata.vout.findIndex(e => {
+      return (
+        e.value === amount &&
+        e.scriptPubKey.hex === script
+      )
+    })
+    assert.ok(vout !== -1, 'matching output not found in transaction')
+    return create_vin({ txid, vout, prevout : { value, scriptPubKey : script } })
   }
 
   async select_utxos (

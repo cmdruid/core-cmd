@@ -9,4 +9,6 @@ const wallet  = await client.load_wallet('faucet')
 const address = await wallet.gen_address({ address_type : 'bech32m' })
 const desc    = await wallet.get_descriptor(address)
 
-console.log(desc)
+const utxo = await wallet.create_utxo(100_000, address)
+
+console.log('utxo:', utxo)
