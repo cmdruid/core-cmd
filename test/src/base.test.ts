@@ -1,5 +1,7 @@
 import { Test }       from 'tape'
 import { CoreClient } from '../../src/index.js'
+import { TxTemplate } from '@scrow/tapscript'
+import { parse_addr } from '@scrow/tapscript/address'
 
 const { DEBUG = false } = process.env
 
@@ -18,11 +20,16 @@ export default function (
       // Load a wallet for Alice.
       const { alice_wallet, bob_wallet } = await client.load_wallets('alice_wallet', 'bob_wallet')
 
+      // Create a receive address for Alice.
+      const address = await alice_wallet.gen_address()
+
       // Create a tx template that pays to Alice.
-      const template = {
+      const template : TxTemplate = {
         vout : [
-          await alice_wallet.create_txout(400_000),
-          await alice_wallet.create_txout(400_000)
+          {
+            value        : 100_000,
+            scriptPubKey : parse_addr(address).hex
+          }
         ]
       }
 

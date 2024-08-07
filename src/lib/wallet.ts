@@ -3,8 +3,9 @@ import { encode_script } from '@scrow/tapscript/script'
 import { CoreClient }    from './client.js'
 import { cmd_config }    from '../config.js'
 import { get_pubkey }    from '@cmdcode/crypto-tools/keys'
+import { HDKey }         from '@scure/bip32'
 
-import { derive_key, parse_extkey } from '@cmdcode/crypto-tools/hd'
+import { derive_key }               from '@cmdcode/crypto-tools/hd'
 import { P2TR, P2WPKH, parse_addr } from '@scrow/tapscript/address'
 import { Transaction, bip32Path }   from '@scure/btc-signer'
 
@@ -19,7 +20,6 @@ import {
   ScriptWord,
   SigHashOptions,
   TxData,
-  TxInput,
   TxTemplate,
 } from '@scrow/tapscript'
 
@@ -46,6 +46,7 @@ import {
   DescriptorKeyPair,
   FundingOptions,
   MethodArgs,
+  TxPrevout,
   UTXO,
   WalletConfig,
   WalletDescriptors,
@@ -253,20 +254,25 @@ export class CoreWallet {
   }
 
   async get_descriptor (address : string) : Promise<DescriptorKeyPair> {
-    const data   = await this.parse_address(address)
-    const desc   = parse_descriptor(data.desc)
-    const xprvs  = await this.xprvs
-    const xprv   = xprvs.find(e => e.label === desc.parent_label)
-    assert.exists(xprv)
-    const seckey = parse_extkey(xprv.keystr).seckey
-    assert.exists(seckey)
-    const pubkey = get_pubkey(seckey, desc.keytype.includes('tr')).hex
+    const addr_data  = await this.parse_address(address)
+    const addr_desc  = parse_descriptor(addr_data.desc)
+    const wall_xprvs = await this.xprvs
+    const addr_xprv  = wall_xprvs.find(e => e.label === addr_desc.parent_label)
+    assert.exists(addr_xprv)
+    const hd_mst = HDKey.fromExtendedKey(addr_xprv.keystr, { private : 70615956, public : 70617039 })
+    const hd_chd = hd_mst.derive('m' + addr_desc.fullpath)
+    const is_tr  = addr_desc.keytype.includes('tr')
+    assert.exists(hd_chd.privateKey)
+    assert.exists(hd_chd.publicKey)
+    const seckey = new Buff(hd_chd.privateKey).hex
+    const pubkey = get_pubkey(seckey, is_tr).hex
     return {
       pubkey,
       seckey,
-      desc   : data.desc,
-      mprint : data.hdmasterfingerprint,
-      path   : desc.fullpath
+      desc   : addr_data.desc,
+      master : addr_xprv.keystr,
+      mprint : addr_data.hdmasterfingerprint,
+      path   : addr_desc.fullpath
     }
   }
 
@@ -345,7 +351,7 @@ export class CoreWallet {
     amount  : number,
     address : string,
     mine_block ?: boolean
-  ) : Promise<TxInput> {
+  ) : Promise<TxPrevout> {
     const value  = BigInt(amount)
     const script = parse_addr(address).hex
     const txid   = await this.send_funds(amount, address, mine_block)
@@ -358,7 +364,7 @@ export class CoreWallet {
       )
     })
     assert.ok(vout !== -1, 'matching output not found in transaction')
-    return create_vin({ txid, vout, prevout : { value, scriptPubKey : script } })
+    return { txid, vout, prevout : { value, scriptPubKey : script } }
   }
 
   async select_utxos (

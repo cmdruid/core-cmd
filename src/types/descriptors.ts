@@ -37,4 +37,5 @@ export interface DescriptorKeyPair {
   path   : string
   pubkey : string
   seckey : string
+  master : string
 }

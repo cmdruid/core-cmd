@@ -69,3 +69,12 @@ export interface TxOutpoint {
   scriptPubKey  : ScriptKey
   coinbase      : boolean
 }
+
+export interface TxPrevout {
+  txid    : string
+  vout    : number
+  prevout : {
+    value        : bigint
+    scriptPubKey : string
+  }
+}
