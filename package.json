@@ -1,6 +1,6 @@
 {
   "name": "@cmdcode/core-cmd",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "description": "Command Bitcoin Core using a suite of automation tools.",
   "author": "Christopher Scott",
   "license": "MIT",
