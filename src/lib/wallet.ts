@@ -12,8 +12,7 @@ import { Transaction, bip32Path }   from '@scure/btc-signer'
 import {
   encode_tapscript,
   get_taptweak,
-  tweak_pubkey,
-  tweak_seckey
+  tweak_pubkey
 } from '@scrow/tapscript/tapkey'
 
 import {
@@ -265,16 +264,8 @@ export class CoreWallet {
     const is_p2tr = addr_desc.keytype.includes('tr')
     assert.exists(hd_chd.privateKey)
     assert.exists(hd_chd.publicKey)
-    let seckey, pubkey
-    if (is_p2tr) {
-      const secret = new Buff(hd_chd.privateKey).hex
-      const tweak  = get_taptweak(hd_chd.publicKey.slice(1))
-      seckey = tweak_seckey(secret, tweak).hex
-      pubkey = get_pubkey(seckey, true).hex
-    } else {
-      seckey = new Buff(hd_chd.privateKey).hex
-      pubkey = get_pubkey(seckey, false).hex
-    }
+    const seckey = new Buff(hd_chd.privateKey).hex
+    const pubkey = get_pubkey(seckey, is_p2tr).hex
     return {
       pubkey,
       seckey,
