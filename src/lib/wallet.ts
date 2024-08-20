@@ -268,7 +268,7 @@ export class CoreWallet {
     let seckey, pubkey
     if (is_p2tr) {
       const secret = new Buff(hd_chd.privateKey).hex
-      const tweak  = get_taptweak(hd_chd.publicKey)
+      const tweak  = get_taptweak(hd_chd.publicKey.slice(1))
       seckey = tweak_seckey(secret, tweak).hex
       pubkey = get_pubkey(seckey, true).hex
     } else {
