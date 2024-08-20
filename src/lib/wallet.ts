@@ -12,7 +12,8 @@ import { Transaction, bip32Path }   from '@scure/btc-signer'
 import {
   encode_tapscript,
   get_taptweak,
-  tweak_pubkey
+  tweak_pubkey,
+  tweak_seckey
 } from '@scrow/tapscript/tapkey'
 
 import {
@@ -259,13 +260,21 @@ export class CoreWallet {
     const wall_xprvs = await this.xprvs
     const addr_xprv  = wall_xprvs.find(e => e.label === addr_desc.parent_label)
     assert.exists(addr_xprv)
-    const hd_mst = HDKey.fromExtendedKey(addr_xprv.keystr, { private : 70615956, public : 70617039 })
-    const hd_chd = hd_mst.derive('m' + addr_desc.fullpath)
-    const is_tr  = addr_desc.keytype.includes('tr')
+    const hd_mst  = HDKey.fromExtendedKey(addr_xprv.keystr, { private : 70615956, public : 70617039 })
+    const hd_chd  = hd_mst.derive('m' + addr_desc.fullpath)
+    const is_p2tr = addr_desc.keytype.includes('tr')
     assert.exists(hd_chd.privateKey)
     assert.exists(hd_chd.publicKey)
-    const seckey = new Buff(hd_chd.privateKey).hex
-    const pubkey = get_pubkey(seckey, is_tr).hex
+    let seckey, pubkey
+    if (is_p2tr) {
+      const secret = new Buff(hd_chd.privateKey).hex
+      const tweak  = get_taptweak(hd_chd.publicKey)
+      seckey = tweak_seckey(secret, tweak).hex
+      pubkey = get_pubkey(seckey, true).hex
+    } else {
+      seckey = new Buff(hd_chd.privateKey).hex
+      pubkey = get_pubkey(seckey, false).hex
+    }
     return {
       pubkey,
       seckey,
