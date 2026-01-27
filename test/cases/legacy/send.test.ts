@@ -1,5 +1,5 @@
 import { Test }       from 'tape'
-import { CoreClient } from '../../src/index.js'
+import { CoreClient } from '../../../src/index.js'
 
 export default function (
   tape   : Test,
@@ -13,7 +13,7 @@ export default function (
       // Load a wallet for Alice.
       const { alice_wallet, bob_wallet } = await client.load_wallets('alice_wallet', 'bob_wallet')
 
-      const alice_addr = await alice_wallet.new_address
+      const alice_addr = await alice_wallet.generate_address()
 
       // Load a wallet for Bob and ensure it has funds.
       await bob_wallet.ensure_funds(60_000)

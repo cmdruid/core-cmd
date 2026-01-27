@@ -1,7 +1,8 @@
-import { ExtKey }       from '@cmdcode/crypto-tools'
-import { parse_extkey } from '@cmdcode/crypto-tools/hd'
-import { hash160 }      from '@cmdcode/crypto-tools/hash'
+import { HDKey } from '@scure/bip32'
+import { Buff } from '@vbyte/buff'
+import { hash160 } from '../util/crypto.js'
 import { is_uint }      from './util.js'
+import { TESTNET_VERSIONS, MAINNET_VERSIONS } from '../const.js'
 
 import {
   DescriptorData,
@@ -59,15 +60,26 @@ export function parse_descriptor (
 
   const index = (idx === undefined || idx === '*') ? '0' : idx
 
-  let extkey : ExtKey | undefined,
+  let extkey : HDKey | undefined,
       label  : string
 
   if (is_extended) {
-    extkey = parse_extkey(keystr)
-    label  = hash160(extkey.pubkey).slice(0, 4).hex
+    // Use appropriate version bytes based on key prefix
+    const versions = (keystr.startsWith('tprv') || keystr.startsWith('tpub')) 
+      ? TESTNET_VERSIONS 
+      : MAINNET_VERSIONS
+    extkey = HDKey.fromExtendedKey(keystr, versions)
+    const pubkey = extkey.publicKey
+    if (pubkey) {
+      label = new Buff(hash160(pubkey).slice(0, 4)).hex
+    } else {
+      label = '00000000'
+    }
   } else {
     extkey = undefined
-    label  = hash160(keystr).slice(0, 4).hex
+    const keyBytes = Buff.hex(keystr)
+    const hashed = hash160(keyBytes)
+    label = new Buff(hashed.slice(0, 4)).hex
   }
 
   return {

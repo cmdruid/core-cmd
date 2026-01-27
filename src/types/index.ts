@@ -1,10 +1,12 @@
-export * from './block.js' 
+export * from './address.js'
+export * from './block.js'
 export * from './config.js'
 export * from './core.js'
 export * from './descriptors.js'
 export * from './events.js'
 export * from './info.js'
 export * from './scan.js'
+export * from './signing.js'
 export * from './tx.js'
 export * from './wallet.js'
 

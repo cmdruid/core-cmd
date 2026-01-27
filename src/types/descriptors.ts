@@ -1,4 +1,4 @@
-import { ExtKey } from '@cmdcode/crypto-tools'
+import type { HDKey } from '@scure/bip32'
 
 export type DescriptorData = DescriptorItem & DescriptorMeta
 
@@ -13,7 +13,7 @@ export interface DescriptorItem {
 
 export interface DescriptorMeta {
   descriptor   : string
-  extkey      ?: ExtKey
+  extkey      ?: HDKey
   keystr       : string
   is_extended  : boolean
   is_parent    : boolean

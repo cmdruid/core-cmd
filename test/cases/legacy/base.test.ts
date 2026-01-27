@@ -1,7 +1,9 @@
 import { Test }       from 'tape'
-import { CoreClient } from '../../src/index.js'
-import { TxTemplate } from '@scrow/tapscript'
-import { parse_addr } from '@scrow/tapscript/address'
+import { CoreClient } from '../../../src/index.js'
+import * as BTC from '@vbyte/btc-dev'
+import type { TxTemplate } from '@vbyte/btc-dev'
+
+const { parse_address } = BTC.ADDRESS
 
 const { DEBUG = false } = process.env
 
@@ -15,20 +17,21 @@ export default function (
 
     try {
       // Print information about the blockchain.
-      if (DEBUG) console.log('chain info:', await client.chain_info)
+      if (DEBUG) console.log('chain info:', await client.get_chain_info())
 
       // Load a wallet for Alice.
       const { alice_wallet, bob_wallet } = await client.load_wallets('alice_wallet', 'bob_wallet')
 
       // Create a receive address for Alice.
-      const address = await alice_wallet.gen_address()
+      const address = await alice_wallet.generate_address()
 
       // Create a tx template that pays to Alice.
       const template : TxTemplate = {
+        vin  : [],
         vout : [
           {
-            value        : 100_000,
-            scriptPubKey : parse_addr(address).hex
+            value     : 100_000,
+            script_pk : parse_address(address).script.hex
           }
         ]
       }
