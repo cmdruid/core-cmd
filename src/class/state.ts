@@ -2,8 +2,9 @@
  * State machine for CoreDaemon lifecycle management
  */
 
-import { EventEmitter } from '@vbyte/util'
-import { create_core_debug } from '../util/debug.js'
+import { EventEmitter }      from '@vbyte/util'
+
+import { create_core_debug } from '@/util/debug.js'
 
 const debug = create_core_debug('state')
 
@@ -47,10 +48,10 @@ const VALID_TRANSITIONS: Record<DaemonState, DaemonState[]> = {
  * State change event data
  */
 export interface StateChangeEvent {
-  from: DaemonState
-  to: DaemonState
-  timestamp: Date
-  error?: Error
+  from      : DaemonState
+  to        : DaemonState
+  timestamp : Date
+  error?    : Error
 }
 
 /**
@@ -139,9 +140,9 @@ export class DaemonStateMachine extends EventEmitter<StateMachineEvents> {
     }
 
     const event: StateChangeEvent = {
-      from: this._state,
-      to: newState,
-      timestamp: new Date(),
+      from      : this._state,
+      to        : newState,
+      timestamp : new Date(),
       error
     }
 

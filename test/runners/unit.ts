@@ -4,7 +4,7 @@
 
 import tape from 'tape'
 import { glob } from 'glob'
-import { pathToFileURL } from 'url'
+import { pathToFileURL } from 'node:url'
 import { create_mock_context } from '../lib/helpers/context.js'
 import { DEFAULT_UNIT_TIMEOUT_MS, UNIT_TEST_PATTERN } from '../lib/const.js'
 import type { UnitRunnerConfig, TestResults, MockTestContext } from '../lib/types/test.types.js'
@@ -35,10 +35,10 @@ export async function run_unit_tests(
   config: UnitRunnerConfig = {}
 ): Promise<TestResults> {
   const {
-    timeout_ms      = DEFAULT_UNIT_TIMEOUT_MS,
+    timeout_ms: _timeout_ms = DEFAULT_UNIT_TIMEOUT_MS,
     glob_pattern    = UNIT_TEST_PATTERN,
-    bail_on_failure = false,
-    verbose         = false
+    bail_on_failure: _bail_on_failure = false,
+    verbose: _verbose = false
   } = config
 
   const results: TestResults = {
@@ -152,21 +152,17 @@ if (isMainModule) {
   console.log('================')
   console.log('')
 
-  // Keep event loop alive - tape doesn't do this in non-TTY environments
-  const keepAlive = setInterval(() => {}, 100)
-
-  // Run tests - this queues tape tests
+  // Run tests - this queues tape tests, then tape runs them
   run_unit_tests({ verbose: true })
     .then(() => {
-      // Tests are now queued, register onFinish to clean up
-      // Note: onFinish is called AFTER all queued tests complete
+      // After all tests are queued, register onFinish to exit cleanly
+      // This ensures we don't exit before tape processes all queued tests
       tape.onFinish(() => {
-        clearInterval(keepAlive)
+        process.exitCode = 0
       })
     })
     .catch(err => {
       console.error('Unit tests failed:', err)
-      clearInterval(keepAlive)
       process.exitCode = 1
     })
 }

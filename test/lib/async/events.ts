@@ -2,7 +2,7 @@
  * Event waiting utilities for async operations
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import { TimeoutError } from './timeout.js'
 import type { CoreDaemon, DaemonState } from '../../../src/index.js'
 
@@ -240,7 +240,7 @@ export async function wait_for_ready(
     return
   }
 
-  await wait_for_event(daemon, 'ready', { timeout_ms })
+  await wait_for_event(daemon as unknown as EventEmitter, 'ready', { timeout_ms })
 }
 
 /**
@@ -261,7 +261,7 @@ export async function wait_for_state(
     return
   }
 
-  await wait_for_event(daemon, 'state:change', {
+  await wait_for_event(daemon as unknown as EventEmitter, 'state:change', {
     timeout_ms,
     filter: (data: unknown) => {
       const event = data as { state: DaemonState }
@@ -281,7 +281,7 @@ export async function wait_for_shutdown(
   daemon     : CoreDaemon,
   timeout_ms : number = 10_000
 ): Promise<void> {
-  await wait_for_event(daemon, 'shutdown', { timeout_ms })
+  await wait_for_event(daemon as unknown as EventEmitter, 'shutdown', { timeout_ms })
 }
 
 // ============================================================================
@@ -323,7 +323,7 @@ export function event_stream<T = unknown>(
             return { done: true, value: undefined }
           }
           if (queue.length > 0) {
-            return { done: false, value: queue.shift()! }
+            return { done: false, value: queue.shift() as T }
           }
           const value = await new Promise<T>(r => { resolve = r })
           return { done: false, value }

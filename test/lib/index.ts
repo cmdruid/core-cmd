@@ -26,7 +26,8 @@ export * from './async/index.js'
 export * from './helpers/index.js'
 
 // Reporters
-export { create_reporter, TestReporter, ReporterType } from './reporters/index.js'
+export { create_reporter } from './reporters/index.js'
+export type { TestReporter, ReporterType } from './reporters/index.js'
 
 // Constants
 export * from './const.js'

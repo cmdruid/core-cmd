@@ -2,7 +2,7 @@
  * Mock implementation of DaemonStateMachine for unit testing
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import { DaemonState } from '../../../src/index.js'
 import type {
   MockStateMachineConfig,

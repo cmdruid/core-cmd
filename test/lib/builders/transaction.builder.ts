@@ -145,7 +145,7 @@ export class TransactionBuilder {
       scriptPubKey: {
         asm     : `OP_0 ${addr}`,
         desc    : `addr(${addr})`,
-        hex     : '0014' + '0'.repeat(40),
+        hex     : `0014${'0'.repeat(40)}`,
         address : addr,
         type
       }
@@ -163,8 +163,8 @@ export class TransactionBuilder {
       value: 0,
       scriptPubKey: {
         asm  : `OP_RETURN ${hex}`,
-        desc : 'raw(6a' + hex.length.toString(16).padStart(2, '0') + hex + ')',
-        hex  : '6a' + hex.length.toString(16).padStart(2, '0') + hex,
+        desc : `raw(6a${hex.length.toString(16).padStart(2, '0')}${hex})`,
+        hex  : `6a${hex.length.toString(16).padStart(2, '0')}${hex}`,
         type : 'nulldata'
       }
     })
@@ -340,7 +340,8 @@ export class TransactionBuilder {
         vout        : input.vout,
         scriptSig   : input.scriptSig ?? { asm: '', hex: '' },
         txinwitness : input.txinwitness ?? [],
-        sequence    : input.sequence ?? 0xfffffffd
+        sequence    : input.sequence ?? 0xfffffffd,
+        coinbase    : undefined
       })),
       vout: this.state.outputs.map((output, index) => ({
         n            : index,
@@ -348,7 +349,7 @@ export class TransactionBuilder {
         scriptPubKey : output.scriptPubKey ?? {
           asm     : 'OP_0 mock',
           desc    : 'addr(mock)',
-          hex     : '0014' + '0'.repeat(40),
+          hex     : `0014${'0'.repeat(40)}`,
           address : output.address,
           type    : 'witness_v0_keyhash'
         }

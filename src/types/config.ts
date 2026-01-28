@@ -1,4 +1,4 @@
-import { AddressType } from './address.js'
+import type { AddressType } from '@/types/address.js'
 
 /**
  * Network type for Bitcoin Core
@@ -31,7 +31,7 @@ export interface CoreConfig {
   // Network settings
   /** Bitcoin network to use */
   network: NetworkName | string
-  /** Use random ports to avoid conflicts (for testing) */
+  /** Disable P2P listening (-listen=0) and use random RPC port to avoid conflicts with other instances */
   isolated: boolean
 
   // RPC connection
@@ -61,8 +61,6 @@ export interface CoreConfig {
   debug: boolean
   /** Enable verbose logging */
   verbose: boolean
-  /** Enable cache for RPC calls */
-  use_cache: boolean
   /** Catch uncaught exceptions and shutdown daemon */
   safemode: boolean
   /** Don't spawn a new process, connect to existing */
@@ -109,8 +107,6 @@ export interface AddressConfig {
  * Command execution configuration
  */
 export interface CmdConfig {
-  /** Whether to use cached result */
-  cache: boolean
   /** Additional CLI parameters */
   params: string[]
 }

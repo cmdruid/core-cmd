@@ -8,8 +8,6 @@ import type {
   BlockData,
   BlockHeader,
   WalletInfo,
-  TxStatus,
-  ScanResults
 } from '../../../src/index.js'
 
 // ============================================================================
@@ -172,7 +170,7 @@ export interface UTXOFixtureData {
 export interface WalletFixtureData {
   name    : string
   balance : number
-  utxos   : import('../../src/index.js').UTXO[]
+  utxos   : import('../../../src/index.js').UTXO[]
 }
 
 /**

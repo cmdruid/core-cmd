@@ -1,16 +1,18 @@
 // Main classes exported directly (OOP convention)
-export { CoreDaemon } from './class/core.js'
-export { CoreClient } from './class/client.js'
-export { CoreWallet } from './class/wallet.js'
-export { SigningContext } from './class/signing.js'
+export { CoreDaemon } from '@/class/core.js'
+export { CoreClient } from '@/class/client.js'
+export { CoreWallet } from '@/class/wallet.js'
+
+// Wallet types for private key extraction
+export type { KeyType, ExtractedKey, PsbtOptions, PsbtResult } from '@/class/wallet.js'
 
 // Process management
-export { ProcessState, SpawnedProcess, ConnectedProcess, ManagedProcess } from './class/process.js'
-export type { ProcessController } from './class/process.js'
+export { ProcessState, SpawnedProcess, ConnectedProcess, ManagedProcess } from '@/class/process.js'
+export type { ProcessController } from '@/class/process.js'
 
 // State machine
-export { DaemonState, DaemonStateMachine } from './class/state.js'
-export type { StateChangeEvent, StateMachineEvents } from './class/state.js'
+export { DaemonState, DaemonStateMachine } from '@/class/state.js'
+export type { StateChangeEvent, StateMachineEvents } from '@/class/state.js'
 
 // Error classes
 export {
@@ -22,7 +24,7 @@ export {
   WalletError,
   ConfigError,
   NetworkError
-} from './class/errors.js'
+} from '@/class/errors.js'
 
 // ZMQ event bus
 export {
@@ -35,7 +37,7 @@ export {
   type BlockEvent,
   type TransactionEvent,
   type SequenceEvent
-} from './class/zmq.js'
+} from '@/class/zmq.js'
 
 // Polling event bus
 export {
@@ -43,7 +45,7 @@ export {
   create_poll_event_bus,
   type PollConfig,
   type PollEvents
-} from './class/poll.js'
+} from '@/class/poll.js'
 
 // Event bus factory
 export {
@@ -53,14 +55,36 @@ export {
   type EventBus,
   type EventBusType,
   type EventBusResult
-} from './class/events.js'
+} from '@/class/events.js'
 
 // Descriptors
-export { parse_descriptor, parse_segment } from './lib/descriptors.js'
+export { parse_descriptor, parse_segment } from '@/lib/descriptors.js'
+
+// Validation utilities
+export {
+  validate_process_name,
+  validate_address,
+  assert_valid_address,
+  validate_pubkey,
+  assert_valid_pubkey,
+  validate_amount,
+  assert_valid_amount,
+  validate_path,
+  assert_valid_path,
+  validate_block_count,
+  assert_valid_block_count,
+  validate_descriptor_input,
+  assert_valid_descriptor_input,
+  sanitize_for_log,
+  sanitize_params_for_log,
+  ALLOWED_PROCESS_NAMES,
+  MAX_SATS,
+  MIN_SATS
+} from '@/lib/validation.js'
 
 // Utilities use namespace pattern
-export * as CONST from './const.js'
-export * as ERRORS from './class/errors.js'
+export * as CONST  from '@/const.js'
+export * as ERRORS from '@/class/errors.js'
 
 // Constants (individual exports for backwards compat)
 export {
@@ -103,8 +127,8 @@ export {
   HEALTH_CHECK_STALE_MS,
   ERROR_PATTERNS,
   WARNING_PATTERNS
-} from './const.js'
-export type { NetworkName } from './const.js'
+} from '@/const.js'
+export type { NetworkName } from '@/const.js'
 
 // Configuration helpers
 export {
@@ -114,7 +138,7 @@ export {
   normalize_network,
   CORE_DEFAULTS,
   CMD_DEFAULTS
-} from './config.js'
+} from '@/config.js'
 
 // All types
-export type * from './types/index.js'
+export type * from '@/types/index.js'

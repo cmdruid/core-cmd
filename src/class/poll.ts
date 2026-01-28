@@ -5,10 +5,15 @@
  * Polls Bitcoin Core RPC periodically for changes.
  */
 
-import { EventEmitter } from '@vbyte/util'
-import { create_core_debug } from '../util/debug.js'
-import type { CoreClient } from './client.js'
-import type { BlockEvent, TransactionEvent } from './zmq.js'
+// External dependencies
+import { EventEmitter }      from '@vbyte/util'
+
+// Internal modules
+import { create_core_debug } from '@/util/debug.js'
+
+// Type imports
+import type { CoreClient }                   from '@/class/client.js'
+import type { BlockEvent, TransactionEvent } from '@/class/zmq.js'
 
 const debug = create_core_debug('poll')
 

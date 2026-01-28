@@ -108,7 +108,7 @@ export function get_default_rpc_responses(): Record<string, unknown> {
           scriptPubKey : {
             asm     : 'OP_HASH160 mock_hash OP_EQUAL',
             desc    : 'addr(mock_address)',
-            hex     : '00' + '14' + '0'.repeat(40),
+            hex     : `0014${'0'.repeat(40)}`,
             address : SAMPLE_ADDRESS,
             type    : 'witness_v0_keyhash'
           }
@@ -136,7 +136,7 @@ export function get_default_rpc_responses(): Record<string, unknown> {
         vout          : 0,
         address       : SAMPLE_ADDRESS,
         label         : 'faucet',
-        scriptPubKey  : '0014' + '0'.repeat(40),
+        scriptPubKey  : `0014${'0'.repeat(40)}`,
         amount        : 50,
         confirmations : 100,
         spendable     : true,
@@ -247,7 +247,7 @@ export function get_default_rpc_responses(): Record<string, unknown> {
       scriptPubKey  : {
         asm     : 'OP_HASH160 mock OP_EQUAL',
         desc    : 'addr(mock)',
-        hex     : '0014' + '0'.repeat(40),
+        hex     : `0014${'0'.repeat(40)}`,
         address : SAMPLE_ADDRESS,
         type    : 'witness_v0_keyhash'
       },
@@ -269,7 +269,7 @@ export function get_default_rpc_responses(): Record<string, unknown> {
     // Get address info
     getaddressinfo: {
       address         : SAMPLE_ADDRESS,
-      scriptPubKey    : '0014' + '0'.repeat(40),
+      scriptPubKey    : `0014${'0'.repeat(40)}`,
       ismine          : true,
       iswatchonly     : false,
       isscript        : false,
@@ -420,7 +420,7 @@ export function create_tx_response(
         scriptPubKey: {
           asm     : 'OP_HASH160 mock OP_EQUAL',
           desc    : 'addr(mock)',
-          hex     : '0014' + '0'.repeat(40),
+          hex     : `0014${'0'.repeat(40)}`,
           address : SAMPLE_ADDRESS,
           type    : 'witness_v0_keyhash'
         }

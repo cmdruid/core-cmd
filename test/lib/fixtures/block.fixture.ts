@@ -212,7 +212,7 @@ export function create_reorg_fixtures(): {
   const forkChain = create_block_chain_fixture(5, forkPoint)
   // Update the fork chain to have different hashes
   forkChain.forEach((block, i) => {
-    block.hash = 'f' + block.hash.slice(1)
+    block.hash = `f${block.hash.slice(1)}`
     if (i > 0) {
       block.previousblockhash = forkChain[i - 1].hash
     }

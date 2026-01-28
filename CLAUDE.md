@@ -57,22 +57,17 @@ This is a TypeScript library for automating Bitcoin Core operations, designed fo
    - Manages wallet loading/creation
 
 3. **CoreWallet** (`src/class/wallet.ts`) - Wallet abstraction
-   - Transaction building with `fund_tx()` and `build_tx()`
-   - External signing API with `export_keypair()`, `add_signature()`
+   - PSBT creation and signing via RPC
+   - Private key export (gated) with `extract_private_key()`
    - UTXO management and address generation
    - Automatic balance ensuring with `ensure_funds()`
    - Integrates with @vbyte/btc-dev for script handling
-
-4. **SigningContext** (`src/class/signing.ts`) - Multi-step signing workflows
-   - State management for external signing protocols
-   - Supports FROST, MuSig2, DLCs, adaptor signatures
-   - Debug logging for signature collection
 
 ### Critical Implementation Details
 
 - **Import Convention**: Always use `.js` extension for local imports even though files are `.ts`
 - **Network Modes**: Default is `regtest` for testing. Production uses `main` or `test`
-- **Process Isolation**: Use `isolated: true` to avoid port conflicts with existing Bitcoin Core
+- **Process Isolation**: Use `isolated: true` to disable P2P listening (`-listen=0`) and avoid conflicts with existing Bitcoin Core
 - **Error Handling**: Custom error classes in `src/class/errors.ts`. Methods return `null` for missing data, throw for critical errors
 - **Type System**: All RPC responses have TypeScript interfaces in `src/types/`
 - **Naming Convention**: All public methods use snake_case.
@@ -119,36 +114,35 @@ const funded = await wallet.fund_tx(template)
 const txid = await client.publish_tx(funded, true) // true = mine block
 ```
 
-### External Signing API
+### Private Key Export (Gated)
 
 ```typescript
-// Export keypair for external signing (FROST, MuSig2, etc.)
-const keypair = await wallet.export_keypair(address)
-// keypair.type === 'taproot' | 'segwit'
-// keypair.pubkey (32 or 33 bytes hex)
-// keypair.seckey (32 bytes hex)
+// Extract private key for external signing (FROST, MuSig2, etc.)
+// Requires: wallet created with { allow_key_export: true }
+const wallet = await client.load_wallet('test')
+// wallet must be created with allow_key_export: true
 
-// Build transaction with pre-computed sighashes
-const unsigned = await wallet.build_tx(template)
-// unsigned.sighashes[0].sighash - 32-byte hash to sign
-// unsigned.sighashes[0].key_type - 'taproot' or 'segwit'
+const key = await wallet.extract_private_key(address)
+// key.type === 'taproot' | 'segwit'
+// key.pubkey (32 or 33 bytes hex)
+// key.seckey (32 bytes hex) - SENSITIVE
+// key.path - BIP32 derivation path
+// key.fingerprint - master key fingerprint
+```
 
-// Add external signatures
-const signed = await wallet.add_signature(unsigned, {
-  index: 0,
-  key_type: 'taproot',
-  signature: schnorrSignature  // 64-byte Uint8Array
-})
+### PSBT Workflow
 
-// Finalize and broadcast
-const txhex = await wallet.finalize_tx(signed)
+```typescript
+// Create, sign, and finalize a transaction via PSBT
+const outputs = { 'bcrt1q...': 0.001 }  // address -> amount in BTC
+const { psbt, fee } = await wallet.create_psbt(outputs)
+const signedPsbt = await wallet.sign_psbt(psbt)
+const { hex } = await wallet.finalize_psbt(signedPsbt)
+const txid = await client.publish_tx(hex)
+
+// Or use the convenience method
+const txhex = await wallet.create_and_sign_tx(outputs)
 const txid = await client.publish_tx(txhex)
-
-// Alternative: Use SigningContext for multi-step workflows
-const ctx = await wallet.create_signing_context(template)
-ctx.pending_inputs  // [0, 1, 2]
-ctx.add_signature({ index: 0, key_type: 'taproot', signature: sig })
-const txhex = await ctx.finalize()
 ```
 
 ## Error Classes
@@ -255,7 +249,7 @@ const daemon = await CoreDaemon.spawn({
   datapath : '/path/to/datadir',      // Blockchain data
   confpath : '/path/to/bitcoin.conf', // Config file
   network  : 'regtest',               // Network type
-  isolated : true,                    // Use random ports
+  isolated : true,                    // Disable P2P listening
   debug    : true,                    // Enable debug output
   verbose  : true,                    // Extra logging
   timeout  : 30000,                   // Startup timeout (ms)

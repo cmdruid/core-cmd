@@ -7,13 +7,16 @@
  * - null if events are disabled
  */
 
-import { create_core_debug } from '../util/debug.js'
-import type { CoreClient } from './client.js'
-import type { CoreConfig } from '../types/index.js'
-import { ZMQEventBus, is_zmq_available } from './zmq.js'
-import { PollEventBus } from './poll.js'
-import type { BlockEvent, TransactionEvent, SequenceEvent, ZMQEvents } from './zmq.js'
-import type { PollEvents } from './poll.js'
+// Internal modules
+import { create_core_debug }             from '@/util/debug.js'
+import { ZMQEventBus, is_zmq_available } from '@/class/zmq.js'
+import { PollEventBus }                  from '@/class/poll.js'
+
+// Type imports
+import type { CoreClient }       from '@/class/client.js'
+import type { CoreConfig }       from '@/types/index.js'
+import type { PollEvents }       from '@/class/poll.js'
+import type { BlockEvent, TransactionEvent, SequenceEvent, ZMQEvents } from '@/class/zmq.js'
 
 const debug = create_core_debug('events')
 

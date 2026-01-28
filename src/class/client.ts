@@ -1,36 +1,24 @@
-import * as BTC from '@vbyte/btc-dev'
-import { Buff } from '@vbyte/buff'
-import { create_core_debug } from '../util/debug.js'
-import { now, deep_copy } from '@vbyte/util'
-import { CoreDaemon } from './core.js'
-import { CoreWallet } from './wallet.js'
-import { CommandError } from './errors.js'
+// External dependencies
+import * as BTC              from '@vbyte/btc-dev'
+import { Buff }              from '@vbyte/buff'
+import { now, deep_copy }    from '@vbyte/util'
 
-// Type assertion for namespace exports (library types don't match JS exports)
-const { parse_script } = (BTC as any).SCRIPT
-const { encode_tx } = (BTC as any).TX
-
-type TxData = BTC.TxData
-type TxBytes = string | Uint8Array | Buff
-
-const debug = create_core_debug('client')
-
+// Internal modules
+import { CoreDaemon }        from '@/class/core.js'
+import { CoreWallet }        from '@/class/wallet.js'
+import { CommandError, NetworkError, ConfigError } from '@/class/errors.js'
+import { parse_args, run_cmd }                    from '@/lib/cmd.js'
+import { convert_value, convert_vout }            from '@/lib/util.js'
+import { cmd_config, core_config }                from '@/config.js'
+import { create_safe_debug, safe_params_string }  from '@/util/safe-debug.js'
 import {
-  parse_args,
-  run_cmd
-} from '../lib/cmd.js'
+  assert_valid_address,
+  assert_valid_block_count,
+  assert_valid_descriptor_input
+} from '@/lib/validation.js'
 
-import {
-  cmd_config,
-  core_config
-} from '../config.js'
-
-import {
-  convert_value,
-  convert_vout
-} from '../lib/util.js'
-
-import {
+// Type imports
+import type {
   BlockQuery,
   ClientConfig,
   MethodArgs,
@@ -46,15 +34,23 @@ import {
   TxOutpoint,
   TxResult,
   TxStatus,
-} from '../types/index.js'
+} from '@/types/index.js'
+
+// Type assertion for namespace exports (library types don't match JS exports)
+const { parse_script } = (BTC as any).SCRIPT
+const { encode_tx }    = (BTC as any).TX
+
+type TxData  = BTC.TxData
+type TxBytes = string | Uint8Array | Buff
+
+const debug = create_safe_debug('client')
 
 export class CoreClient {
-  _core: CoreDaemon
+  _core: CoreDaemon | null
   readonly _opt: CoreConfig
 
   params: string[]
 
-  _cache: [string, unknown]
   _faucet: CoreWallet | null
 
   constructor(
@@ -62,8 +58,6 @@ export class CoreClient {
     config?: Partial<ClientConfig>
   ) {
     const opt = core_config(config)
-
-    this._cache = ['null', null]
 
     this.params = [
       `-chain=${opt.network}`,
@@ -96,10 +90,11 @@ export class CoreClient {
     }
 
     this._opt = opt
-    this._core = core!
+    this._core = core ?? null
     this._faucet = null
 
-    debug('initializing with params: %s', this.params.join(' '))
+    // Log params with credentials sanitized
+    debug('initializing with params: %s', safe_params_string(this.params))
   }
 
   // ============================================================
@@ -140,14 +135,14 @@ export class CoreClient {
    * Get list of loaded wallets
    */
   async get_loaded_wallets(): Promise<string[]> {
-    return this.cmd<string[]>('listwallets', null, { cache: true })
+    return this.cmd<string[]>('listwallets')
   }
 
   /**
    * Get list of created wallets in wallet directory
    */
   async get_created_wallets(): Promise<string[]> {
-    const list = await this.cmd<WalletList>('listwalletdir', null, { cache: true })
+    const list = await this.cmd<WalletList>('listwalletdir')
     return list.wallets.map(x => x.name)
   }
 
@@ -160,18 +155,12 @@ export class CoreClient {
     args?: MethodArgs,
     config?: Partial<CmdConfig>
   ): Promise<T> {
-    const { clipath = 'bitcoin-cli', use_cache } = this.opt
-    const { cache, params } = cmd_config(config)
+    const { clipath = 'bitcoin-cli' } = this.opt
+    const { params } = cmd_config(config)
     const parsed = parse_args(method, args)
     const witness = [...this.params, ...params, ...parsed]
-    const label = witness.join('')
     debug('cmd: %s', parsed.join(' '))
-    if (cache && use_cache && this._cache[0] === label) {
-      debug('using cache for method: %s', method)
-      return deep_copy(this._cache[1]) as T
-    }
     const data = await run_cmd<T>(clipath, witness)
-    this._cache = [label, data]
     return deep_copy(data) as T
   }
 
@@ -191,7 +180,7 @@ export class CoreClient {
       hash = await this.cmd<string>('getblockhash', height)
     }
     if (typeof hash !== 'string') {
-      throw new Error('Unable to fetch any blocks!')
+      throw new CommandError('Unable to fetch any blocks', '_get_block_data', '', '')
     }
     return (txdata === true)
       ? this.cmd<BlockData>('getblock', hash)
@@ -232,15 +221,24 @@ export class CoreClient {
 
   /**
    * Mine blocks on regtest network
-   * @param count Number of blocks to mine
+   * @param count Number of blocks to mine (1-10000)
    * @param addr Address to receive coinbase (optional)
+   * @throws Error if not on regtest, count is invalid, or address is invalid
    */
   async mine_blocks(count = 1, addr?: string): Promise<string[]> {
     if (this.opt.network !== 'regtest') {
-      throw new Error('You can only generate funds on regtest network!')
+      throw new NetworkError('mine_blocks requires regtest network', this.opt.network)
     }
+    // Validate block count
+    assert_valid_block_count(count)
+    // Get or validate address
     if (addr === undefined) {
+      if (!this.core?.faucet) {
+        throw new ConfigError('No faucet available for mining', 'core', null)
+      }
       addr = await this.core.faucet.get_address('faucet')
+    } else {
+      assert_valid_address(addr, this.opt.network)
     }
     debug('mining %d blocks to %s', count, addr)
     return this.cmd<string[]>('generatetoaddress', [count, addr])
@@ -340,11 +338,7 @@ export class CoreClient {
     const { value, scriptPubKey } = txout
     const script = parse_script(scriptPubKey.hex)
     const prevout = { value, scriptPubKey: script.asm }
-    const txinput = {
-      txid,
-      vout,
-      prevout
-    }
+    const txinput = { txid, vout, prevout }
     return { txinput, status }
   }
 
@@ -419,7 +413,7 @@ export class CoreClient {
    */
   async set_time(timestamp?: number): Promise<void> {
     if (this.opt.network !== 'regtest') {
-      throw new Error('You can only manipulate time on regtest network!')
+      throw new NetworkError('set_time requires regtest network', this.opt.network)
     }
     const ts = timestamp ?? now()
     await this.cmd<string>('setmocktime', [ts])
@@ -430,15 +424,30 @@ export class CoreClient {
 // Helper functions
 // ============================================================
 
+/**
+ * Build a descriptor string for UTXO scanning
+ *
+ * Validates inputs to prevent descriptor injection attacks.
+ *
+ * @param opt - Scan options (address, pubkey, or script)
+ * @returns Valid descriptor string
+ * @throws Error if input is invalid or potentially malicious
+ */
 function get_scan_desc(opt: ScanOptions): string {
   if (opt.address !== undefined) {
+    // Validate address to prevent injection
+    assert_valid_descriptor_input(opt.address)
     return `addr(${opt.address})`
   } else if (opt.pubkey !== undefined) {
+    // Validate pubkey to prevent injection
+    assert_valid_descriptor_input(opt.pubkey)
     return `combo(${opt.pubkey})`
   } else if (opt.script) {
+    // Validate script to prevent injection
+    assert_valid_descriptor_input(opt.script)
     return `raw(${opt.script})`
   }
-  throw new Error('No scan option specified!')
+  throw new ConfigError('No scan option specified', 'scan_options', opt)
 }
 
 function get_tx_status(

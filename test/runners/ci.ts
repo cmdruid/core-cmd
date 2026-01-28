@@ -2,11 +2,10 @@
  * CI test runner - optimized for continuous integration
  */
 
-import { existsSync } from 'fs'
-import { spawn } from 'child_process'
+import { existsSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import {
   DEFAULT_CI_TIMEOUT_MS,
-  CI_TEST_CONFIG,
   detect_ci_environment
 } from '../lib/const.js'
 import type { CIRunnerConfig, CITestResults, TestResults } from '../lib/types/test.types.js'
@@ -114,9 +113,9 @@ export async function run_ci_tests(
   const {
     suites             = defaultSuites,
     global_timeout_ms  = DEFAULT_CI_TIMEOUT_MS,
-    reporter           = 'tap',
+    reporter: _reporter = 'tap',
     fail_fast          = true,
-    retry_failed       = 0
+    retry_failed: _retry_failed = 0
   } = config
 
   const environment = detect_ci_environment()

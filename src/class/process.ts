@@ -6,13 +6,16 @@
  * - ConnectedProcess: Connects to an existing Bitcoin Core process
  */
 
-import { ChildProcess, spawn } from 'child_process'
-import { create_core_debug } from '../util/debug.js'
-import { CoreClient } from './client.js'
-import { check_process } from '../lib/cmd.js'
-import { ensure_file, ensure_path } from '../lib/util.js'
-import { CoreConfig } from '../types/index.js'
-import { ProcessError, ConnectionError } from './errors.js'
+// External dependencies
+import { ChildProcess, spawn } from 'node:child_process'
+
+// Internal modules
+import { CoreClient }                  from '@/class/client.js'
+import { ProcessError, ConnectionError } from '@/class/errors.js'
+import { check_process }               from '@/lib/cmd.js'
+import { ensure_file, ensure_path }    from '@/lib/util.js'
+import { sanitize_for_log }            from '@/lib/validation.js'
+import { create_safe_debug }           from '@/util/safe-debug.js'
 import {
   DEFAULT_SHUTDOWN_TIMEOUT_MS,
   DEFAULT_HEALTH_CHECK_INTERVAL_MS,
@@ -20,9 +23,12 @@ import {
   ERROR_PATTERNS,
   WARNING_PATTERNS,
   HEALTH_CHECK_STALE_MS
-} from '../const.js'
+} from '@/const.js'
 
-const debug = create_core_debug('process')
+// Type imports
+import type { CoreConfig } from '@/types/index.js'
+
+const debug = create_safe_debug('process')
 
 /**
  * Process lifecycle states
@@ -60,6 +66,9 @@ interface ProcessLogs {
 
 /**
  * Circular buffer for process logs
+ *
+ * All logs are sanitized before storage to prevent sensitive data
+ * (credentials, private keys) from being exposed in error reports.
  */
 class ProcessLogBuffer implements ProcessLogs {
   stdout: string[] = []
@@ -69,7 +78,8 @@ class ProcessLogBuffer implements ProcessLogs {
   add_stdout(data: string): void {
     const lines = data.split('\n').filter(l => l.trim())
     for (const line of lines) {
-      this.stdout.push(line)
+      // Sanitize before storing to prevent credential leakage
+      this.stdout.push(sanitize_for_log(line))
       if (this.stdout.length > this.max_lines) {
         this.stdout.shift()
       }
@@ -79,7 +89,8 @@ class ProcessLogBuffer implements ProcessLogs {
   add_stderr(data: string): void {
     const lines = data.split('\n').filter(l => l.trim())
     for (const line of lines) {
-      this.stderr.push(line)
+      // Sanitize before storing to prevent credential leakage
+      this.stderr.push(sanitize_for_log(line))
       if (this.stderr.length > this.max_lines) {
         this.stderr.shift()
       }
@@ -311,7 +322,7 @@ export class SpawnedProcess implements ProcessController {
         }
       }, shutdownTimeout)
 
-      this.process!.once('close', () => {
+      this.process?.once('close', () => {
         clearTimeout(forceKillTimer)
         this.state = ProcessState.Stopped
         debug('Bitcoin Core process stopped')
@@ -319,7 +330,7 @@ export class SpawnedProcess implements ProcessController {
       })
 
       // Try graceful shutdown first
-      const killed = this.process!.kill('SIGTERM')
+      const killed = this.process?.kill('SIGTERM')
       if (!killed) {
         clearTimeout(forceKillTimer)
         this.state = ProcessState.Stopped

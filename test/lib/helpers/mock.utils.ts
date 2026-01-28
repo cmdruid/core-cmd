@@ -174,7 +174,7 @@ export function create_spy<T extends (...args: any[]) => any>(
 ): Spy<T> {
   const calls: Array<{ args: Parameters<T>; result?: ReturnType<T>; error?: Error }> = []
 
-  const spy = function(...args: Parameters<T>): ReturnType<T> {
+  const spy = ((...args: Parameters<T>): ReturnType<T> => {
     const call: { args: Parameters<T>; result?: ReturnType<T>; error?: Error } = { args }
     calls.push(call)
 
@@ -190,7 +190,7 @@ export function create_spy<T extends (...args: any[]) => any>(
     }
 
     return undefined as ReturnType<T>
-  } as Spy<T>
+  }) as Spy<T>
 
   Object.defineProperties(spy, {
     calls: {

@@ -1,6 +1,6 @@
-import { CoreClient } from '../class/client.js'
-import type { BlockEvent, TransactionEvent, SequenceEvent } from '../class/zmq.js'
-import type { StateChangeEvent } from '../class/state.js'
+import type { CoreClient }       from '@/class/client.js'
+import type { StateChangeEvent } from '@/class/state.js'
+import type { BlockEvent, TransactionEvent, SequenceEvent } from '@/class/zmq.js'
 
 export interface CoreEvent {
   // Lifecycle events

@@ -1,13 +1,15 @@
-import { RATE_LIMIT, DEFAULT_SPAWN_TIMEOUT_MS } from '../const.js'
-import { MethodArgs } from '../types/index.js'
-import { ManagedProcess } from '../class/process.js'
-import { CommandError, create_command_error } from '../class/errors.js'
-import { create_core_debug } from '../util/debug.js'
+// External dependencies
+import { execFile, spawn } from 'node:child_process'
 
-import {
-  exec,
-  spawn
-} from 'child_process'
+// Internal modules
+import { ManagedProcess }                    from '@/class/process.js'
+import { CommandError, create_command_error } from '@/class/errors.js'
+import { RATE_LIMIT, DEFAULT_SPAWN_TIMEOUT_MS } from '@/const.js'
+import { create_core_debug }                 from '@/util/debug.js'
+import { validate_process_name }             from '@/lib/validation.js'
+
+// Type imports
+import type { MethodArgs } from '@/types/index.js'
 
 const debug = create_core_debug('cmd')
 const delay = (ms = 1000) => new Promise(res => setTimeout(res, ms))
@@ -187,16 +189,37 @@ export function spawn_process(
   })
 }
 
+/**
+ * Check if a Bitcoin Core process is running
+ *
+ * Uses execFile with array arguments to prevent command injection.
+ * Process name must be in the allowlist (bitcoind, bitcoin-qt, bitcoin-cli).
+ *
+ * @param name - Process name to check (must be in allowlist)
+ * @returns Promise resolving to true if process is running
+ * @throws Error if process name is not in allowlist
+ */
 export function check_process(name: string): Promise<boolean> {
-  const unix = `ps aux | grep ${name} | grep -v grep`
-  const wind = `tasklist | grep ${name}`
-  const cmd = process.platform === 'win32' ? wind : unix
-  
+  // Validate against allowlist to prevent injection
+  const validName = validate_process_name(name)
+
   return new Promise((resolve) => {
-    exec(cmd, (_err, out) => {
-      if (out) resolve(true)
-      else resolve(false)
-    })
+    if (process.platform === 'win32') {
+      // Windows: Use tasklist with filter
+      // tasklist /FI "IMAGENAME eq bitcoind.exe" /NH
+      const args = ['/FI', `IMAGENAME eq ${validName}.exe`, '/NH']
+      execFile('tasklist', args, (_err, out) => {
+        // Check if output contains the process name (not "INFO: No tasks")
+        resolve(out.includes(validName))
+      })
+    } else {
+      // Unix: Use pgrep with exact match (-x flag)
+      // pgrep -x bitcoind
+      execFile('pgrep', ['-x', validName], (_err, out) => {
+        // pgrep returns output (PIDs) if process found, empty if not
+        resolve(out.trim().length > 0)
+      })
+    }
   })
 }
 

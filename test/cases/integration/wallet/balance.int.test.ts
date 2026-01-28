@@ -2,7 +2,6 @@
  * Integration tests for wallet balance operations
  */
 
-import type { Test } from 'tape'
 import type { DaemonTestContext } from '../../../lib/types/test.types.js'
 import { SATS_PER_BTC } from '../../../lib/const.js'
 import { create_assertions } from '../../../lib/helpers/assertions.js'

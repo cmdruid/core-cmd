@@ -196,7 +196,7 @@ export async function write_junit_file(
   filePath : string,
   suiteName?: string
 ): Promise<void> {
-  const { writeFile } = await import('fs/promises')
+  const { writeFile } = await import('node:fs/promises')
   const xml = format_as_junit(results, suiteName)
   await writeFile(filePath, xml, 'utf-8')
 }

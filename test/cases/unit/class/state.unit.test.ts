@@ -2,11 +2,9 @@
  * Unit tests for DaemonStateMachine mock
  */
 
-import type { TestFunction as TapeTest } from 'tape'
-import type { MockTestContext } from '../../../lib/types/test.types.js'
+import type { TapeHarness, MockTestContext } from '../../../lib/types/test.types.js'
 import { DaemonState } from '../../../../src/index.js'
 import {
-  MockStateMachine,
   create_mock_state_machine,
   STATE_SEQUENCES
 } from '../../../lib/mocks/state.mock.js'
@@ -20,7 +18,7 @@ import {
  * State machine unit tests
  */
 export default function state_unit_tests(
-  tape: TapeTest,
+  tape: TapeHarness,
   _ctx: MockTestContext
 ): void {
   tape('State machine - initial state', (t) => {

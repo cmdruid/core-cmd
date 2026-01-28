@@ -40,7 +40,7 @@ export function create_tx_fixture(overrides: Partial<TxResult> = {}): TxResult {
         scriptPubKey: {
           asm     : 'OP_0 mock_pubkey_hash',
           desc    : `addr(${SAMPLE_ADDRESS})`,
-          hex     : '0014' + '0'.repeat(40),
+          hex     : `0014${'0'.repeat(40)}`,
           address : SAMPLE_ADDRESS,
           type    : 'witness_v0_keyhash'
         }
@@ -110,7 +110,7 @@ export function create_coinbase_tx_fixture(height: number = 1): TxResult {
         scriptPubKey: {
           asm     : 'OP_0 mock_pubkey_hash',
           desc    : `addr(${SAMPLE_ADDRESS})`,
-          hex     : '0014' + '0'.repeat(40),
+          hex     : `0014${'0'.repeat(40)}`,
           address : SAMPLE_ADDRESS,
           type    : 'witness_v0_keyhash'
         }
@@ -196,11 +196,11 @@ export function create_full_tx_fixture(
     vsize   : 144 + inputs.length * 26 + outputs.length * 30,
     weight  : 573,
     locktime: 0,
-    vin: inputs.map((input, index) => ({
+    vin: inputs.map((input, _index) => ({
       txid        : input.txid,
       vout        : input.vout,
       scriptSig   : { asm: '', hex: '' },
-      txinwitness : ['0'.repeat(144), '02' + 'c'.repeat(64)],
+      txinwitness : ['0'.repeat(144), `02${'c'.repeat(64)}`],
       sequence    : 0xfffffffd
     })),
     vout: outputs.map((output, index) => ({
@@ -209,7 +209,7 @@ export function create_full_tx_fixture(
       scriptPubKey: {
         asm     : 'OP_0 mock_hash',
         desc    : `addr(${output.address})`,
-        hex     : '0014' + '0'.repeat(40),
+        hex     : `0014${'0'.repeat(40)}`,
         address : output.address,
         type    : 'witness_v0_keyhash'
       }
@@ -236,7 +236,7 @@ export function create_confirmation_test_fixtures(): {
   six_conf    : TxResult
   deep_conf   : TxResult
 } {
-  const baseTxid = generate_txid()
+  const _baseTxid = generate_txid()
 
   return {
     unconfirmed : create_mempool_tx_fixture(),
@@ -263,7 +263,8 @@ export function create_tx_chain_fixture(length: number = 3): TxResult[] {
           vout        : 0,
           scriptSig   : { asm: '', hex: '' },
           txinwitness : [],
-          sequence    : 0xffffffff
+          sequence    : 0xffffffff,
+          coinbase    : undefined
         }
       ]
     })
@@ -281,7 +282,7 @@ export function create_rbf_fixtures(): {
   original    : TxResult
   replacement : TxResult
 } {
-  const txid = generate_txid()
+  const _txid = generate_txid()
 
   return {
     original: create_mempool_tx_fixture(),

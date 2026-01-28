@@ -4,8 +4,7 @@
  * Tests both PollEventBus and ZMQEventBus, plus the event bus factory.
  */
 
-import type { TestFunction as TapeTest } from 'tape'
-import type { MockTestContext } from '../../../lib/types/test.types.js'
+import type { TapeHarness, MockTestContext } from '../../../lib/types/test.types.js'
 import { PollEventBus } from '../../../../src/class/poll.js'
 import { ZMQEventBus, is_zmq_available, ZMQTopic } from '../../../../src/class/zmq.js'
 import { createEventBus } from '../../../../src/class/events.js'
@@ -24,7 +23,6 @@ function create_test_config(overrides: Partial<CoreConfig> = {}): CoreConfig {
     init_delay       : 0,
     debug            : false,
     verbose          : false,
-    use_cache        : false,
     safemode         : false,
     no_spawn         : false,
     params           : [],
@@ -39,7 +37,7 @@ function create_test_config(overrides: Partial<CoreConfig> = {}): CoreConfig {
 // ============================================================================
 
 export default function events_unit_tests(
-  tape: TapeTest,
+  tape: TapeHarness,
   _ctx: MockTestContext
 ): void {
 
@@ -195,7 +193,7 @@ export default function events_unit_tests(
     const zmq = new ZMQEventBus(config)
 
     // Initially has default topics
-    const initialTopics = zmq.get_topics()
+    const _initialTopics = zmq.get_topics()
 
     // Subscribe to new topic
     zmq.subscribe(ZMQTopic.Sequence)

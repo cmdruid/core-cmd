@@ -2,7 +2,7 @@
  * TAP (Test Anything Protocol) reporter
  */
 
-import type { TestResults, TestResult } from '../types/test.types.js'
+import type { TestResults, } from '../types/test.types.js'
 import type { TestReporter } from './index.js'
 
 // ============================================================================

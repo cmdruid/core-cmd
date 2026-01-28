@@ -1,12 +1,14 @@
-import { access, constants, mkdir, writeFile } from 'fs/promises'
+// External dependencies
+import { access, constants, mkdir, writeFile } from 'node:fs/promises'
 
-import { TxOutput } from '../types/index.js'
+// Type imports
+import type { TxOutput } from '@/types/index.js'
 
 export async function path_exists (filepath : string) {
   try {
     await access(filepath, constants.R_OK | constants.W_OK)
     return true
-  } catch (err) {
+  } catch {
     return false
   }
 }
@@ -45,7 +47,7 @@ export function is_uint (
   }
   return (
     typeof value === 'number' &&
-    !isNaN(value)             &&
+    !Number.isNaN(value)      &&
     value >= 0                &&
     value <= max_val          &&
     Math.floor(value) === value

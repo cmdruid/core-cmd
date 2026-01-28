@@ -171,7 +171,7 @@ export const SAMPLE_TXID = 'a'.repeat(64)
 export const SAMPLE_BLOCKHASH = 'b'.repeat(64)
 
 /** Sample public key (66 hex chars compressed) */
-export const SAMPLE_PUBKEY = '02' + 'c'.repeat(64)
+export const SAMPLE_PUBKEY = `02${'c'.repeat(64)}`
 
 /** Sample private key (64 hex chars) */
 export const SAMPLE_PRIVKEY = 'd'.repeat(64)
@@ -206,14 +206,15 @@ export function detect_ci_environment(): 'github' | 'gitlab' | 'jenkins' | 'circ
 
 /** Default test configuration */
 export const DEFAULT_TEST_CONFIG = {
-  corepath : 'test/bin/bitcoind',
-  clipath  : 'test/bin/bitcoin-cli',
-  confpath : 'test/bitcoin.conf',
-  datapath : 'test/data',
-  debug    : true,
-  isolated : true,
-  verbose  : true,
-  network  : 'regtest' as const
+  corepath    : 'test/bin/bitcoind',
+  clipath     : 'test/bin/bitcoin-cli',
+  confpath    : 'test/bitcoin.conf',
+  datapath    : 'test/data',
+  debug       : true,
+  isolated    : true,
+  verbose     : true,
+  network     : 'regtest' as const,
+  core_params : ['-txindex=1']  // Enable txindex for getrawtransaction after mining
 }
 
 /** CI-optimized test configuration */

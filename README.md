@@ -1,324 +1,205 @@
-# Core Command
+# @vbyte/core-cmd
 
-A suite of CI/CD friendly tools that plug into bitcoin core.
+A TypeScript library for automating Bitcoin Core. Designed for CI/CD testing, integration tests, and building applications that interact with the Bitcoin blockchain.
 
-This library is designed for writing test cases that interact with the bitcoin blockchain.
+[![npm version](https://img.shields.io/npm/v/@vbyte/core-cmd.svg)](https://www.npmjs.com/package/@vbyte/core-cmd)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## How to Install
+## Features
 
-```sh
-# Using NPM
-npm i --save-dev @vbyte/core-cmd
-# Using Yarn
-yarn add --dev @vbyte/core-cmd
+- **Process Management** - Spawn, connect to, or auto-detect Bitcoin Core
+- **Wallet Operations** - Balance, UTXOs, addresses, transactions
+- **Transaction Building** - Templates, funding, signing, PSBTs
+- **External Signing** - Support for hardware wallets, FROST, MuSig2
+- **Real-time Events** - Block and transaction notifications via ZMQ or polling
+- **Typed Errors** - Comprehensive error hierarchy for handling failures
+- **CI/CD Ready** - Isolated mode for parallel test execution
+
+## Installation
+
+```bash
+npm install @vbyte/core-cmd
 ```
 
-## How to Use (v2 API)
-
-The `CoreDaemon` class provides static factory methods to spawn or connect to Bitcoin Core:
-
-### Quick Start
-
-```typescript
-import { CoreDaemon } from '@vbyte/core-cmd'
-
-// Spawn a new Bitcoin Core process (regtest by default)
-const core = await CoreDaemon.spawn({
-  datapath : '/path/to/datadir',
-  isolated : true  // Use random ports to avoid conflicts
-})
-
-// Use the client and faucet wallet
-const client = core.client
-const faucet = core.faucet
-
-// Get blockchain info
-const info = await client.get_chain_info()
-console.log('Chain:', info.chain, 'Blocks:', info.blocks)
-
-// Shut down when done
-await core.shutdown()
-```
-
-### Connect to Existing Process
-
-```typescript
-// Connect to an already-running Bitcoin Core
-const core = await CoreDaemon.connect({
-  rpc_host : '127.0.0.1',
-  rpc_port : 18443,
-  rpc_user : 'user',
-  rpc_pass : 'password'
-})
-```
-
-### Auto Mode (Connect or Spawn)
-
-```typescript
-// Automatically connect if Bitcoin Core is running, otherwise spawn
-const core = await CoreDaemon.auto({
-  datapath : '/path/to/datadir',
-  isolated : true
-})
-
-// You can also check if Bitcoin Core is running first
-if (await CoreDaemon.exists()) {
-  console.log('Bitcoin Core detected (bitcoind or bitcoin-qt)')
-}
-
-// Or check for a specific process
-if (await CoreDaemon.exists('bitcoind')) {
-  console.log('bitcoind is running')
-}
-```
-
-### Configuration Options
-
-```typescript
-const config = {
-  // Paths
-  corepath?   : string   // Path to bitcoind binary
-  clipath?    : string   // Path to bitcoin-cli binary
-  confpath?   : string   // Path to bitcoin.conf file
-  datapath?   : string   // Path to data directory
-  cookiepath? : string   // Path to RPC cookie file
-
-  // Network
-  network?  : string   // 'regtest' (default), 'main', 'test', 'signet'
-  isolated? : boolean  // Use random ports (recommended for testing)
-
-  // RPC Connection
-  rpc_host? : string   // RPC host (default: 127.0.0.1)
-  rpc_port? : number   // RPC port
-  rpc_user? : string   // RPC username
-  rpc_pass? : string   // RPC password
-
-  // Behavior
-  debug?   : boolean   // Enable debug output
-  verbose? : boolean   // Extra logging
-  timeout? : number    // Startup timeout in milliseconds
-}
-```
-
-### Using run() for Automatic Cleanup
-
-The `run()` method executes callbacks and automatically shuts down the daemon:
-
-```typescript
-const core = await CoreDaemon.spawn({ isolated: true })
-
-await core.run(async (client) => {
-  // Load a wallet for Alice
-  const aliceWallet = await client.load_wallet('alice_wallet')
-  const aliceAddr = await aliceWallet.generate_address()
-
-  // Load a wallet for Bob and ensure it has funds
-  const bobWallet = await client.load_wallet('bob_wallet')
-  await bobWallet.ensure_funds(1_000_000)  // 1M satoshis
-
-  // Create and fund a transaction
-  const template = {
-    vout: [{
-      value: 800_000,
-      scriptPubKey: aliceAddr
-    }]
-  }
-  const funded = await bobWallet.fund_tx(template)
-  const signed = await bobWallet.sign_tx(funded)
-
-  // Publish and confirm
-  const txid = await client.publish_tx(signed)
-  await client.mine_blocks(1)
-
-  console.log('Transaction confirmed:', txid)
-})
-// Daemon is automatically shut down after run() completes
-```
-
-### Event-Driven Usage
-
-```typescript
-const core = new CoreDaemon({ isolated: true })
-
-// Listen for ready event
-core.on('ready', async (client) => {
-  const wallet = await client.load_wallet('test_wallet')
-  const balance = await wallet.get_balance()
-  console.log('Balance:', balance, 'satoshis')
-
-  await core.shutdown()
-})
-
-// Start the daemon
-await core.startup()
-```
-
-### State Machine Events
-
-The daemon uses a state machine for lifecycle management:
-
-```typescript
-const core = new CoreDaemon({ isolated: true })
-
-// Listen to state changes
-core.stateMachine.on('state:change', (event) => {
-  console.log(`State: ${event.from} -> ${event.to}`)
-})
-
-core.stateMachine.on('state:error', (error) => {
-  console.error('Daemon error:', error.message)
-})
-
-await core.startup()
-```
-
-### Real-Time Events (ZMQ / Polling)
-
-The daemon provides real-time notifications for new blocks and transactions. It automatically selects the best available transport:
-
-1. **ZMQ** (preferred) - Real-time push notifications from Bitcoin Core
-2. **Polling** (fallback) - Periodic RPC polling when ZMQ is unavailable
-
-```typescript
-const core = await CoreDaemon.spawn({
-  isolated: true,
-  // Event bus is enabled by default
-  // events_poll_interval: 1000  // Polling interval (ms)
-})
-
-// Listen for new blocks (works with both ZMQ and Polling)
-core.on('block', (block) => {
-  console.log('New block:', block.hash)
-})
-
-// Listen for new transactions
-core.on('transaction', (tx) => {
-  console.log('New transaction:', tx.txid)
-})
-
-// Check which event bus is in use
-console.log('Event bus type:', core.events_type)  // 'zmq', 'poll', or 'none'
-```
-
-#### Enabling ZMQ
-
-For real-time ZMQ support, install the optional zeromq package:
-
+For real-time ZMQ events (optional):
 ```bash
 npm install zeromq
 ```
 
-Then configure Bitcoin Core with ZMQ endpoints in `bitcoin.conf`:
-
-```conf
-zmqpubhashblock=tcp://127.0.0.1:28332
-zmqpubhashtx=tcp://127.0.0.1:28332
-```
-
-And enable ZMQ in the daemon config:
+## Quick Start
 
 ```typescript
-const core = await CoreDaemon.spawn({
-  zmq_enabled: true,
-  zmq_host: 'tcp://127.0.0.1',
-  zmq_port: 28332
-})
+import { CoreDaemon } from '@vbyte/core-cmd'
 
-// ZMQ-specific events
-core.on('zmq:block', (block) => console.log('ZMQ block:', block.hash))
-core.on('zmq:transaction', (tx) => console.log('ZMQ tx:', tx.txid))
-core.on('zmq:sequence', (seq) => console.log('Sequence:', seq))
+// Spawn Bitcoin Core in isolated mode (regtest)
+const daemon = await CoreDaemon.spawn({ isolated: true })
+
+// Get blockchain info
+const info = await daemon.client.get_chain_info()
+console.log('Chain:', info.chain, 'Blocks:', info.blocks)
+
+// Create a wallet and send funds
+const wallet = await daemon.client.load_wallet('my_wallet')
+await wallet.ensure_funds(100_000_000)  // 1 BTC
+
+const address = await wallet.generate_address()
+const txid = await wallet.send_funds(50_000_000, address)
+console.log('Transaction:', txid)
+
+// Clean up
+await daemon.shutdown()
 ```
 
-## API Reference
+## Connection Methods
 
-### CoreClient Methods
+```typescript
+// Spawn new process
+const daemon = await CoreDaemon.spawn({ isolated: true })
+
+// Connect to existing
+const daemon = await CoreDaemon.connect({
+  rpc_port: 18443,
+  rpc_user: 'user',
+  rpc_pass: 'password'
+})
+
+// Auto-detect: connect if running, spawn if not
+const daemon = await CoreDaemon.auto({ isolated: true })
+
+// Check if running
+const running = await CoreDaemon.exists()
+```
+
+## Transaction Workflow
+
+```typescript
+// Simple send
+const txid = await wallet.send_funds(50_000_000, recipientAddress)
+
+// Custom transaction
+const template = {
+  vout: [
+    { value: 30_000_000, scriptPubKey: address1 },
+    { value: 20_000_000, scriptPubKey: address2 }
+  ]
+}
+const funded = await wallet.fund_tx(template)
+const signed = await wallet.sign_tx(funded)
+const txid = await daemon.client.publish_tx(signed)
+```
+
+## Real-time Events
+
+```typescript
+const daemon = await CoreDaemon.spawn({ isolated: true })
+
+daemon.on('block', (block) => {
+  console.log('New block:', block.hash)
+})
+
+daemon.on('transaction', (tx) => {
+  console.log('New tx:', tx.txid)
+})
+
+// Check event bus type: 'zmq', 'poll', or 'none'
+console.log('Events via:', daemon.events_type)
+```
+
+## Error Handling
+
+```typescript
+import { WalletError, CommandError } from '@vbyte/core-cmd'
+
+try {
+  await wallet.send_funds(amount, address)
+} catch (err) {
+  if (err instanceof WalletError) {
+    console.log('Wallet:', err.wallet, 'Op:', err.operation)
+  }
+}
+```
+
+## Documentation
+
+- **[Architecture](docs/ARCHITECTURE.md)** - System design, components, state machine
+- **[API Reference](docs/API.md)** - Complete method documentation
+- **[Usage Guide](docs/GUIDE.md)** - Tutorials, patterns, best practices
+
+## API Overview
+
+### CoreClient
 
 | Method | Description |
 |--------|-------------|
 | `cmd(method, args?)` | Execute any RPC command |
 | `get_block_count()` | Get current block height |
-| `get_chain_info()` | Get blockchain info |
-| `get_tx(txid)` | Get transaction (null if not found) |
-| `mine_blocks(count, address?)` | Mine blocks (regtest only) |
-| `load_wallet(name)` | Load or create a wallet |
+| `get_tx(txid)` | Get transaction details |
+| `mine_blocks(count)` | Mine blocks (regtest) |
+| `load_wallet(name)` | Load or create wallet |
 | `publish_tx(hex)` | Broadcast transaction |
-| `get_loaded_wallets()` | List loaded wallets |
-| `get_created_wallets()` | List all wallets |
 
-### CoreWallet Methods
+### CoreWallet
 
 | Method | Description |
 |--------|-------------|
-| `get_balance()` | Get balance in satoshis |
-| `generate_address(config?)` | Generate new address |
-| `list_utxos()` | List unspent outputs |
-| `ensure_funds(amount)` | Ensure minimum balance |
-| `fund_tx(template)` | Add inputs/change to tx |
+| `get_balance()` | Balance in satoshis |
+| `generate_address()` | New receiving address |
+| `list_utxos()` | Unspent outputs |
+| `send_funds(amount, addr)` | Send transaction |
+| `fund_tx(template)` | Add inputs/change |
 | `sign_tx(hex)` | Sign transaction |
-| `send_funds(amount, address)` | Send funds |
+| `ensure_funds(amount)` | Ensure minimum balance |
 
-## Error Handling
-
-The library uses a typed error hierarchy:
+## Configuration
 
 ```typescript
-import {
-  CoreError,       // Base class
-  ProcessError,    // Bitcoin Core process failures
-  CommandError,    // RPC command failures
-  ConnectionError, // Connection issues
-  WalletError,     // Wallet operation failures
-  ConfigError      // Configuration errors
-} from '@vbyte/core-cmd'
+const daemon = await CoreDaemon.spawn({
+  // Paths (auto-detected if not specified)
+  corepath: '/path/to/bitcoind',
+  clipath: '/path/to/bitcoin-cli',
+  datapath: '/path/to/datadir',
 
-try {
-  await client.cmd('invalidcommand')
-} catch (err) {
-  if (err instanceof CommandError) {
-    console.log('RPC failed:', err.message)
-    console.log('stderr:', err.stderr)
-  }
-}
+  // Network
+  network: 'regtest',  // 'main', 'test', 'signet'
+  isolated: true,      // Random ports, no P2P
+
+  // Behavior
+  debug: true,
+  timeout: 30000,
+
+  // Events
+  events_enabled: true,
+  zmq_enabled: true,
+  zmq_port: 28332
+})
 ```
 
-## CI/CD Testing
-
-The included `test` and `.github` folders showcase how to use this library with GitHub Actions.
-
-The example test located in `test/src/base.test.ts` uses the `tape` testing library.
-
-## Migration from v1
-
-If you're upgrading from v1, the v2 API now uses **snake_case** as the primary convention:
-
-| v1 API (deprecated camelCase) | v2 API (snake_case) |
-|-------------------------------|---------------------|
-| `client.getTx()` | `client.get_tx()` |
-| `client.mineBlocks()` | `client.mine_blocks()` |
-| `client.getBlockCount()` | `client.get_block_count()` |
-| `wallet.getBalance()` | `wallet.get_balance()` |
-| `wallet.fundTx()` | `wallet.fund_tx()` |
-| `wallet.signTx()` | `wallet.sign_tx()` |
-| `wallet.ensureFunds()` | `wallet.ensure_funds()` |
-| `wallet.generateAddress()` | `wallet.generate_address()` |
-
-Legacy camelCase methods are still available but deprecated.
-
-## Development & Testing
+## Testing
 
 ```bash
-npm install && npm test
+# Run all tests
+npm test
+
+# Unit tests only (no Bitcoin Core needed)
+npm run test:unit
+
+# Integration tests
+npm run test:integration
+
+# E2E tests
+npm run test:e2e
 ```
 
-## Bugs / Issues
+## Requirements
 
-Please post any questions or bug reports on the issues page.
+- Node.js 18+
+- Bitcoin Core 22+ (for testing and runtime)
+- TypeScript 5+ (for development)
 
-## Contributions
+## Contributing
 
-All contributions are welcome!
+Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-Use this code however you like! No warranty!
+MIT - see [LICENSE](LICENSE) for details.

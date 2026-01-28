@@ -1,6 +1,7 @@
-import { DescriptorItem } from './descriptors.js'
+import type { DescriptorItem } from '@/types/descriptors.js'
 
 export interface WalletConfig {
+  // Bitcoin Core wallet options
   disable_private_keys ?: boolean   // Disable the possibility of private keys (only watchonlys are possible in this mode).
   blank                ?: boolean   // Create a blank wallet. A blank wallet has no keys or HD seed. One can be set using sethdseed.
   passphrase           ?: string    // Encrypt the wallet with this passphrase.
@@ -8,6 +9,20 @@ export interface WalletConfig {
   descriptors          ?: boolean   // Create a native descriptor wallet. The wallet will use descriptors internally to handle address creation. Setting to "false" will create a legacy wallet; however, the legacy wallet type is being deprecated and support for creating and opening legacy wallets will be removed in the future.
   load_on_startup      ?: boolean   // Save wallet name to persistent settings and load on startup. True to add wallet to startup list, false to remove, null to leave unchanged.
   external_signer      ?: boolean   // Use an external signer such as a hardware wallet. Requires -signer to be configured. Wallet creation will fail if keys cannot be fetched. Requires disable_private_keys and descriptors set to true.
+
+  // core-cmd security options
+  /**
+   * Enable private key export via extract_private_key() method.
+   *
+   * Default: false (private key export disabled)
+   *
+   * When enabled, allows extraction of child private keys for external
+   * signing protocols (FROST, MuSig2, DLCs, etc.).
+   *
+   * @security Only enable this if you need raw key access. For standard
+   * transactions, use the RPC-based signing methods instead.
+   */
+  allow_key_export     ?: boolean
 }
 
 export interface WalletList {

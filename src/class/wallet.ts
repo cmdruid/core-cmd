@@ -1,15 +1,55 @@
-import { Buff } from '@vbyte/buff'
-import * as BTC from '@vbyte/btc-dev'
-import { create_core_debug } from '../util/debug.js'
-import { Assert } from '@vbyte/util'
-import { CoreClient } from './client.js'
-import { SigningContext } from './signing.js'
-import { cmd_config } from '../config.js'
-import { HDKey } from '@scure/bip32'
-import { Transaction } from '@scure/btc-signer'
-import { sign_message } from '../util/crypto.js'
+// External dependencies
+import * as BTC           from '@vbyte/btc-dev'
+import { Buff }           from '@vbyte/buff'
+import { Assert }         from '@vbyte/util'
+import { HDKey }          from '@scure/bip32'
+import { Transaction }    from '@scure/btc-signer'
 
-const debug = create_core_debug('wallet')
+// Internal modules
+import { CoreClient }                              from '@/class/client.js'
+import { WalletError, ConfigError }                from '@/class/errors.js'
+import { cmd_config }                              from '@/config.js'
+import { parse_descriptor, parse_desc_item }       from '@/lib/descriptors.js'
+import { assert_valid_address, assert_valid_amount } from '@/lib/validation.js'
+import { create_safe_debug }                       from '@/util/safe-debug.js'
+import {
+  DUST_LIMIT,
+  MIN_TX_FEE,
+  SAT_MULTI,
+  RANDOM_SORT,
+  TXIN_SIZE,
+  WIT_VSIZE,
+  TXO_SIZE,
+  BIP32_HARDENED_FLAG,
+  TAPROOT_VERSION
+} from '@/const.js'
+
+// Type imports
+import type {
+  AddressConfig,
+  AddressInfo,
+  AddressType,
+  CmdConfig,
+  FundingOptions,
+  MethodArgs,
+  TxPrevout,
+  UTXO,
+  WalletConfig,
+  WalletDescriptors,
+  WalletInfo,
+  WalletResponse
+} from '@/types/index.js'
+
+const debug = create_safe_debug('wallet')
+
+// Extract needed functions from BTC modules (type assertion for namespace exports)
+const { encode_script }               = (BTC as any).SCRIPT
+const { P2TR, P2WPKH, parse_address } = (BTC as any).ADDRESS
+const { encode_taptweak }             = (BTC as any).TAPROOT
+
+// Type aliases
+type Network    = BTC.ChainNetwork
+type ScriptWord = string | number | Uint8Array
 
 // Helper function for BIP32 path parsing
 function bip32Path(path: string): number[] {
@@ -22,61 +62,59 @@ function bip32Path(path: string): number[] {
   })
 }
 
-// Extract needed functions from BTC modules (type assertion for namespace exports)
-const { encode_script, parse_script } = (BTC as any).SCRIPT
-const { P2TR, P2WPKH, parse_address } = (BTC as any).ADDRESS
-const { encode_tapscript, encode_taptweak } = (BTC as any).TAPROOT
-const { create_tx, decode_tx } = (BTC as any).TX
+/**
+ * Key types for Bitcoin addresses
+ */
+export type KeyType = 'taproot' | 'segwit'
 
-// Type imports
-type Network = BTC.ChainNetwork
-type ScriptWord = string | number | Uint8Array
-type SigHashOptions = BTC.SigHashOptions
-type TxData = BTC.TxData
-type TxTemplate = BTC.TxTemplate
+/**
+ * Extracted private key (child key only, no master)
+ *
+ * @security This contains sensitive private key material.
+ * Handle with extreme care - see extract_private_key() documentation.
+ */
+export interface ExtractedKey {
+  /** Bitcoin address this key controls */
+  address     : string
+  /** Key type: 'taproot' (32-byte x-only) or 'segwit' (33-byte compressed) */
+  type        : KeyType
+  /** Public key in hex */
+  pubkey      : string
+  /** Private key in hex (32 bytes) - SENSITIVE */
+  seckey      : string
+  /** BIP32 derivation path from master */
+  path        : string
+  /** Master key fingerprint */
+  fingerprint : string
+}
 
-import {
-  parse_descriptor,
-  parse_desc_item
-} from '../lib/descriptors.js'
+/**
+ * PSBT creation options
+ */
+export interface PsbtOptions {
+  /** Fee rate in sat/vB (default: 1) */
+  fee_rate?       : number
+  /** Include change output (default: true) */
+  include_change? : boolean
+  /** Lock unspent outputs used (default: false) */
+  lock_unspents?  : boolean
+  /** Confirmation target in blocks for fee estimation */
+  conf_target?    : number
+  /** Fee estimation mode: 'economical' | 'conservative' */
+  estimate_mode?  : 'economical' | 'conservative'
+}
 
-import {
-  AddressConfig,
-  AddressInfo,
-  AddressType,
-  CmdConfig,
-  DescriptorKeyPair,
-  FundingOptions,
-  MethodArgs,
-  TxPrevout,
-  UTXO,
-  WalletConfig,
-  WalletDescriptors,
-  WalletInfo,
-  WalletResponse
-} from '../types/index.js'
-
-import type {
-  BuildTxOptions,
-  ExternalSignature,
-  InputSighash,
-  KeyPair,
-  KeyType,
-  UnsignedTx
-} from '../types/signing.js'
-
-import {
-  DUST_LIMIT,
-  MIN_TX_FEE,
-  SAT_MULTI,
-  RANDOM_SORT,
-  TXIN_SIZE,
-  WIT_VSIZE,
-  TXO_SIZE,
-  BIP32_HARDENED_FLAG,
-  RBF_SEQUENCE,
-  TAPROOT_VERSION
-} from '../const.js'
+/**
+ * Result from PSBT creation
+ */
+export interface PsbtResult {
+  /** Base64-encoded PSBT */
+  psbt      : string
+  /** Fee in satoshis */
+  fee       : number
+  /** Change position (-1 if no change) */
+  changepos : number
+}
 
 export class CoreWallet {
   readonly _addrs: Map<string, string>
@@ -99,7 +137,7 @@ export class CoreWallet {
   }
 
   // ============================================================
-  // Synchronous getters (these are fine)
+  // Synchronous getters
   // ============================================================
 
   get client() {
@@ -114,15 +152,22 @@ export class CoreWallet {
     return this.client.opt.network
   }
 
+  /**
+   * Check if private key export is enabled for this wallet
+   */
+  get key_export_enabled(): boolean {
+    return this._config.allow_key_export === true
+  }
+
   // ============================================================
-  // Async methods (snake_case API)
+  // Wallet Info Methods
   // ============================================================
 
   /**
    * Get wallet info
    */
   async get_info(): Promise<WalletInfo> {
-    return this.cmd<WalletInfo>('getwalletinfo', null, { cache: true })
+    return this.cmd<WalletInfo>('getwalletinfo')
   }
 
   /**
@@ -145,9 +190,13 @@ export class CoreWallet {
    * Get wallet balance in satoshis
    */
   async get_balance(): Promise<number> {
-    const bal = await this.cmd<string>('getbalance', null, { cache: true })
+    const bal = await this.cmd<string>('getbalance')
     return Math.floor(Number(bal) * SAT_MULTI)
   }
+
+  // ============================================================
+  // Address Methods
+  // ============================================================
 
   /**
    * Generate a new address
@@ -166,47 +215,6 @@ export class CoreWallet {
   }
 
   /**
-   * List unspent transaction outputs
-   */
-  async list_utxos(): Promise<UTXO[]> {
-    const utxos = await this.cmd<UTXO[]>('listunspent', 0, { cache: true })
-    return utxos.map(x => ({ ...x, sats: Math.round(x.amount * SAT_MULTI) }))
-  }
-
-  /**
-   * List wallet descriptors
-   * @param includePrivate Whether to include private key data
-   */
-  async list_descriptors(includePrivate = false) {
-    const result = await this.cmd<WalletDescriptors>('listdescriptors', includePrivate, { cache: true })
-    return result.descriptors.map(x => parse_desc_item(x))
-  }
-
-  /**
-   * Get the wpkh xprv descriptor key string
-   */
-  async get_wpkh_xprv(): Promise<string> {
-    const xprvs = await this.list_descriptors(true)
-    const wpkh = xprvs.find(e => e.keytype === 'wpkh')
-    if (wpkh === undefined) {
-      throw new Error('unable to locate wpkh descriptor')
-    }
-    return wpkh.keystr
-  }
-
-  /**
-   * Get the wpkh xpub descriptor key string
-   */
-  async get_wpkh_xpub(): Promise<string> {
-    const xpubs = await this.list_descriptors(false)
-    const wpkh = xpubs.find(e => e.keytype === 'wpkh')
-    if (wpkh === undefined) {
-      throw new Error('unable to locate wpkh descriptor')
-    }
-    return wpkh.keystr
-  }
-
-  /**
    * Get or create an address with the given label
    */
   async get_address(label: string, type: AddressType = 'bech32'): Promise<string> {
@@ -216,7 +224,7 @@ export class CoreWallet {
       return addr
     }
     try {
-      const addr_book = await this.cmd('getaddressesbylabel', label, { cache: true })
+      const addr_book = await this.cmd('getaddressesbylabel', label)
       const addr_list = Object.keys(addr_book)
       addr = addr_list[0]
     } catch {
@@ -230,11 +238,11 @@ export class CoreWallet {
    * Parse address information
    */
   async parse_address(address: string): Promise<AddressInfo> {
-    return this.cmd<AddressInfo>('getaddressinfo', address, { cache: true })
+    return this.cmd<AddressInfo>('getaddressinfo', address)
   }
 
   /**
-   * Get public key from address
+   * Get public key from address (safe - no private key exposure)
    */
   async get_pubkey(address: string): Promise<string> {
     const desc = await this.parse_address(address)
@@ -242,157 +250,47 @@ export class CoreWallet {
   }
 
   /**
-   * Generate a new address and return its public key
+   * Generate a new address and return its public key (safe - no private key exposure)
    */
-  async generate_pubkey(config: AddressConfig): Promise<string> {
+  async generate_pubkey(config?: AddressConfig): Promise<string> {
     const address = await this.generate_address(config)
     return this.get_pubkey(address)
   }
 
+  // ============================================================
+  // UTXO Methods
+  // ============================================================
+
   /**
-   * Get descriptor key pair from address
+   * List unspent transaction outputs
    */
-  async get_descriptor(address: string): Promise<DescriptorKeyPair> {
-    const addr_data = await this.parse_address(address)
-    const addr_desc = parse_descriptor(addr_data.desc)
-    const wall_xprvs = await this.list_descriptors(true)
-    const addr_xprv = wall_xprvs.find(e => e.label === addr_desc.parent_label)
-    Assert.exists(addr_xprv)
-    const hd_mst = HDKey.fromExtendedKey(addr_xprv.keystr, { private: 70615956, public: 70617039 })
-    const hd_chd = hd_mst.derive('m' + addr_desc.fullpath)
-    const is_p2tr = addr_desc.keytype.includes('tr')
-    Assert.exists(hd_chd.privateKey)
-    Assert.exists(hd_chd.publicKey)
-    const seckey = new Buff(hd_chd.privateKey).hex
-    const pubkey = is_p2tr
-      ? new Buff(hd_chd.publicKey).slice(1).hex  // Remove prefix for taproot
-      : new Buff(hd_chd.publicKey).hex
-    return {
-      pubkey,
-      seckey,
-      desc: addr_data.desc,
-      master: addr_xprv.keystr,
-      mprint: addr_data.hdmasterfingerprint,
-      path: addr_desc.fullpath
-    }
+  async list_utxos(): Promise<UTXO[]> {
+    const utxos = await this.cmd<UTXO[]>('listunspent', 0)
+    return utxos.map(x => ({ ...x, sats: Math.round(x.amount * SAT_MULTI) }))
   }
 
   /**
-   * Generate address and get its descriptor
+   * Select UTXOs to fund a transaction
    */
-  async generate_descriptor(config: AddressConfig): Promise<DescriptorKeyPair> {
-    const address = await this.generate_address(config)
-    return this.get_descriptor(address)
-  }
-
-  /**
-   * Send funds to an address
-   * @param amount Amount in satoshis
-   * @param address Destination address
-   * @param mineBlock Whether to mine a block after sending (regtest only)
-   */
-  async send_funds(
+  async select_utxos(
     amount: number,
-    address: string,
-    mine_block = false
-  ): Promise<string> {
-    const amt = amount / SAT_MULTI
-    const config = { address, amount: amt, estimate_mode: 'economical' }
-    debug('sending %d sats to %s', amount, address)
-    const txid = await this.cmd<string>('sendtoaddress', config)
-    if (mine_block) await this.client.mine_blocks(1)
-    return txid
-  }
+    sorter = RANDOM_SORT
+  ): Promise<UTXO[]> {
+    const selected: UTXO[] = []
+    let total = 0
 
-  /**
-   * Ensure wallet has at least the specified balance
-   */
-  async ensure_funds(min_bal: number): Promise<void> {
-    const bal = await this.get_balance()
-    if (bal <= min_bal && this.label !== 'faucet') {
-      await this.drain_faucet(min_bal)
-      if (this.network === 'regtest') {
-        await this.client.mine_blocks(1)
-      }
-    }
-  }
+    const utxos = await this.list_utxos()
+    utxos.sort(sorter)
 
-  /**
-   * Get funds from the faucet wallet
-   */
-  async drain_faucet(
-    amount: number,
-    address?: string
-  ): Promise<string> {
-    if (address === undefined) {
-      address = await this.generate_address()
-    }
-    const faucet = this.client.core.faucet
-    const balance = await faucet.get_balance()
-    if (balance <= amount + 10000) {
-      if (this.network !== 'regtest') {
-        throw new Error('faucet is broke!')
-      } else {
-        const mine_addr = await faucet.get_address('faucet')
-        await this.client.mine_blocks(100, mine_addr)
+    for (const utxo of utxos) {
+      selected.push(utxo)
+      total += utxo.sats
+      if (total === amount || total > amount + DUST_LIMIT) {
+        return selected
       }
     }
 
-    return faucet.send_funds(amount, address, true)
-  }
-
-  /**
-   * Get xprv descriptor by label
-   */
-  async get_xprv(label: string) {
-    const xprvs = await this.list_descriptors(true)
-    return xprvs.find(e => label === e.label)
-  }
-
-  /**
-   * Get signer for descriptor
-   */
-  async get_signer(desc: string) {
-    const { parent_label, fullpath } = parse_descriptor(desc)
-    const xprv = await this.get_xprv(parent_label)
-    Assert.ok(xprv?.extkey !== undefined)
-    const hdkey = xprv.extkey
-    const derived = hdkey.derive('m' + fullpath)
-    Assert.ok(derived.privateKey !== null)
-    const pubkey = derived.publicKey ? new Buff(derived.publicKey).hex : ''
-    const privateKey = derived.privateKey
-
-    // Create a sign_tx function based on keytype
-    const sign_tx = (txdata: TxData, config: SigHashOptions) => {
-      if (!privateKey) {
-        throw new Error('Private key not available')
-      }
-
-      // Create sighash using BTC library based on descriptor type
-      const { hash_segwit_tx, hash_taproot_tx } = (BTC as any).SIGHASH
-
-      // Use segwit hash for wpkh descriptors, taproot for tr descriptors
-      let sighash: Uint8Array
-      try {
-        sighash = desc.startsWith('tr')
-          ? hash_taproot_tx(txdata, config)
-          : hash_segwit_tx(txdata, config)
-      } catch (err) {
-        debug('sighash computation failed: %O', err)
-        throw err
-      }
-
-      // Sign using secp256k1
-      const signature = sign_message(privateKey, sighash)
-
-      // Add sighash flag byte for Bitcoin signatures
-      const sigWithFlag = new Uint8Array(signature.length + 1)
-      sigWithFlag.set(signature)
-      sigWithFlag[signature.length] = config.sigflag || 0x01
-
-      return sigWithFlag
-    }
-    return { pubkey, sign_tx }
+    throw new WalletError('Insufficient funds', this.label, 'select_utxos')
   }
 
   /**
@@ -418,143 +316,148 @@ export class CoreWallet {
     return { txid, vout, prevout: { value, scriptPubKey: script } }
   }
 
+  // ============================================================
+  // Transaction Methods (RPC-based, no internal signing)
+  // ============================================================
+
   /**
-   * Select UTXOs to fund a transaction
+   * Send funds to an address
+   *
+   * Uses Bitcoin Core's sendtoaddress RPC - signing happens in Core.
+   *
+   * @param amount Amount in satoshis (must be positive, max 21M BTC)
+   * @param address Destination address (validated for network)
+   * @param mine_block Whether to mine a block after sending (regtest only)
    */
-  async select_utxos(
+  async send_funds(
     amount: number,
-    sorter = RANDOM_SORT
-  ): Promise<UTXO[]> {
-    const selected: UTXO[] = []
-
-    let total = 0
-
-    const utxos = await this.list_utxos()
-    utxos.sort(sorter)
-
-    for (const utxo of utxos) {
-      selected.push(utxo)
-      total += utxo.sats
-      if (
-        total === amount ||
-        total > amount + DUST_LIMIT
-      ) {
-        return selected
-      }
-    }
-
-    throw new Error('Insufficient funds!')
-  }
-
-  /**
-   * Fund a transaction template
-   */
-  async fund_tx(
-    template: TxTemplate,
-    config: SigHashOptions = {},
-    txfee: number = 1000
-  ) {
-    const txdata = create_tx(template)
-    const vamt = txdata.vout.reduce((prev: number, curr: any) => Number(curr.value) + prev, 0)
-    const utxos = await this.select_utxos(vamt + txfee)
-    const total = utxos.reduce((prev, curr) => curr.sats + prev, 0)
-
-    const change_out: BTC.TxOutput = {
-      value: BigInt(total - vamt - txfee),
-      script_pk: encode_script(await this.generate_script_key()).hex
-    }
-
-    const last_utxo = txdata.vout.at(-1)
-
-    if (
-      last_utxo !== undefined &&
-      parse_script(last_utxo.script_pk).asm.at(0) === 'OP_RETURN'
-    ) {
-      const idx = txdata.vout.length - 1
-      txdata.vout[idx] = change_out
-      txdata.vout.push(last_utxo)
-    } else {
-      txdata.vout.push(change_out)
-    }
-
-    for (let i = 0; i < utxos.length; i++) {
-      const { desc, txid, vout, sats, scriptPubKey } = utxos[i]
-      const { pubkey, sign_tx } = await this.get_signer(desc)
-      // Convert scriptPubKey to script_pk format for BTC library
-      const prevout = { value: BigInt(sats), script_pk: scriptPubKey }
-      const txinput = {
-        txid,
-        vout,
-        prevout,
-        coinbase: null,
-        script_sig: null,
-        sequence: RBF_SEQUENCE,
-        witness: []
-      }
-      const txconfig = { sigflag: 0x81, pubkey, txinput }
-      const signature = sign_tx(txdata, { ...txconfig, ...config })
-      // Convert Uint8Array directly to hex without going through Buff
-      const sigHex = Buffer.from(signature).toString('hex')
-      const witness = [sigHex]
-      if (desc.startsWith('wpkh')) witness.push(pubkey)
-
-      txdata.vin.push({ ...txinput, witness })
-    }
-    return txdata
-  }
-
-  /**
-   * Add segwit descriptor to PSBT input
-   */
-  async add_segwit_desc(
-    psbt: string,
-    pubkey: string,
-    index: number
+    address: string,
+    mine_block = false
   ): Promise<string> {
-    const addr = P2WPKH.create_address(pubkey, this.network as Network)
-    const desc = await this.parse_address(addr)
-    const pdata = Transaction.fromPSBT(Buffer.from(psbt, 'base64'))
-    const der = {
-      fingerprint: Buff.hex(desc.hdmasterfingerprint).num,
-      path: bip32Path(desc.hdkeypath.replace(/h/g, '\''))
-    }
-    pdata.updateInput(index, { bip32Derivation: [[new Buff(pubkey), der]] })
-    return Buffer.from(pdata.toPSBT(0)).toString('base64')
+    assert_valid_amount(amount)
+    assert_valid_address(address, this.network)
+
+    const amt = amount / SAT_MULTI
+    const config = { address, amount: amt, estimate_mode: 'economical' }
+    debug('sending %d sats to %s', amount, address)
+    const txid = await this.cmd<string>('sendtoaddress', config)
+    if (mine_block) await this.client.mine_blocks(1)
+    return txid
   }
 
   /**
-   * Add taproot descriptor to PSBT input
+   * Create a funded PSBT
+   *
+   * Uses Bitcoin Core's walletcreatefundedpsbt RPC.
+   * The PSBT will include inputs from this wallet but NO signatures.
+   *
+   * @param outputs Map of address to amount in BTC (e.g., { "bc1q...": 0.001 })
+   * @param options PSBT creation options
+   * @returns PSBT result with base64-encoded PSBT
    */
-  async add_taproot_desc(
-    psbt: string,
-    pubkey: string,
-    index: number,
-    scripts: string[] = [],
-    version = TAPROOT_VERSION
-  ): Promise<string> {
-    // Use encode_taptweak to compute the tweaked public key
-    const tweak_result = encode_taptweak(pubkey)
-    const tapkey = tweak_result.slice(1).hex  // Remove prefix byte
-    const addr = P2TR.create_address(tapkey, this.network as Network)
-    const desc = await this.parse_address(addr)
-    const pdata = Transaction.fromPSBT(Buffer.from(psbt, 'base64'))
-    const hashes = scripts.map(e => encode_tapscript(e, version).uint)
-    const der = {
-      fingerprint: Buff.hex(desc.hdmasterfingerprint).num,
-      path: bip32Path(desc.hdkeypath.replace(/h/g, '\''))
+  async create_psbt(
+    outputs: Record<string, number>,
+    options: PsbtOptions = {}
+  ): Promise<PsbtResult> {
+    const {
+      fee_rate = 1,
+      include_change = true,
+      lock_unspents = false,
+      conf_target,
+      estimate_mode = 'economical'
+    } = options
+
+    // Build options object for RPC
+    const rpc_options: Record<string, unknown> = {
+      includeWatching: false,
+      lockUnspents: lock_unspents,
+      fee_rate,
+      estimate_mode
     }
-    pdata.updateInput(index, { tapBip32Derivation: [[new Buff(pubkey), { hashes, der }]] })
-    return Buffer.from(pdata.toPSBT(0)).toString('base64')
+
+    if (!include_change) {
+      rpc_options.changePosition = -1
+    }
+
+    if (conf_target !== undefined) {
+      rpc_options.conf_target = conf_target
+    }
+
+    // walletcreatefundedpsbt [inputs] [outputs] locktime options
+    const result = await this.cmd<PsbtResult>(
+      'walletcreatefundedpsbt',
+      [[], [outputs], 0, rpc_options]
+    )
+
+    return result
   }
 
   /**
-   * Fund a PSBT
+   * Sign a PSBT using Bitcoin Core's wallet
+   *
+   * Uses walletprocesspsbt RPC - signing happens securely in Core.
+   *
+   * @param psbt Base64-encoded PSBT
+   * @returns Signed PSBT (base64)
+   */
+  async sign_psbt(psbt: string): Promise<string> {
+    const ret = await this.cmd<{ psbt: string; complete: boolean }>(
+      'walletprocesspsbt',
+      [psbt, true]
+    )
+    return ret.psbt
+  }
+
+  /**
+   * Finalize a PSBT and extract the transaction
+   *
+   * @param psbt Base64-encoded signed PSBT
+   * @returns Finalized transaction hex
+   */
+  async finalize_psbt(psbt: string): Promise<{ hex: string; complete: boolean }> {
+    return this.cmd<{ hex: string; complete: boolean }>(
+      'finalizepsbt',
+      [psbt, true]
+    )
+  }
+
+  /**
+   * Create, sign, and finalize a PSBT in one call
+   *
+   * Convenience method that combines create_psbt + sign_psbt + finalize_psbt.
+   * All signing happens securely in Bitcoin Core.
+   *
+   * @param outputs Map of address to amount in BTC
+   * @param options PSBT creation options
+   * @returns Transaction hex ready for broadcast
+   */
+  async create_and_sign_tx(
+    outputs: Record<string, number>,
+    options: PsbtOptions = {}
+  ): Promise<string> {
+    const { psbt } = await this.create_psbt(outputs, options)
+    const signed = await this.sign_psbt(psbt)
+    const { hex, complete } = await this.finalize_psbt(signed)
+
+    if (!complete) {
+      throw new WalletError('Transaction signing incomplete - missing signatures', this.label, 'create_and_sign_tx')
+    }
+
+    return hex
+  }
+
+  /**
+   * Fund an existing PSBT with wallet UTXOs
+   *
+   * Adds inputs from this wallet to fund the PSBT's outputs.
+   * Does NOT sign - use sign_psbt() after.
    */
   async fund_psbt(
     psbt: string,
     options: FundingOptions = {}
   ): Promise<string> {
     const pdata = Transaction.fromPSBT(Buffer.from(psbt, 'base64'))
+    const { decode_tx } = (BTC as any).TX
     const txdata = decode_tx(pdata.unsignedTx, false)
 
     let { amount, feerate = 1, vsize = pdata.vsize } = options
@@ -587,7 +490,6 @@ export class CoreWallet {
 
     for (let i = 0; i < utxos.length; i++) {
       const { desc, txid, vout, sats, scriptPubKey } = utxos[i]
-
       const vin_idx = i + pdata.inputsLength
 
       pdata.addInput({
@@ -597,23 +499,21 @@ export class CoreWallet {
       })
 
       const d = parse_descriptor(desc)
-      const pubkey = (d.extkey !== undefined && d.extkey.publicKey)
+      const pubkey = d.extkey?.publicKey
         ? new Buff(d.extkey.publicKey).hex
         : d.keystr
 
       if (d.keytype === 'wpkh') {
-        // wpkh pubkey should be 33 bytes (66 hex chars)
         Assert.ok(pubkey.length === 66, `Invalid wpkh pubkey size: ${pubkey.length / 2} bytes`)
         pdata.updateInput(vin_idx, {
           bip32Derivation: [
             [
               new Buff(pubkey),
-              { fingerprint: Buff.hex(d.parent_label).num, path: bip32Path('m' + d.fullpath) }
+              { fingerprint: Buff.hex(d.parent_label).num, path: bip32Path(`m${d.fullpath}`) }
             ]
           ]
         })
       } else if (d.keytype === 'tr') {
-        // taproot pubkey should be 32 bytes (64 hex chars)
         Assert.ok(pubkey.length === 64, `Invalid taproot pubkey size: ${pubkey.length / 2} bytes`)
         pdata.updateInput(vin_idx, {
           tapBip32Derivation: [
@@ -623,283 +523,244 @@ export class CoreWallet {
                 hashes: [],
                 der: {
                   fingerprint: Buff.hex(d.parent_label).num,
-                  path: bip32Path('m' + d.fullpath)
+                  path: bip32Path(`m${d.fullpath}`)
                 }
               }
             ]
           ]
         })
       } else {
-        throw new Error('unknown key type: ' + d.keytype)
+        throw new ConfigError('Unknown key type', 'key_type', d.keytype)
       }
     }
 
     return Buffer.from(pdata.toPSBT(0)).toString('base64')
   }
 
+  // ============================================================
+  // Descriptor Methods (public info only)
+  // ============================================================
+
   /**
-   * Sign a PSBT
+   * List wallet descriptors (public keys only by default)
+   *
+   * @param includePrivate Whether to include private key data (requires allow_key_export)
    */
-  async sign_psbt(psbt: string): Promise<string> {
-    const ret = await this.cmd('walletprocesspsbt', [psbt, true])
-    return ret['psbt']
+  async list_descriptors(includePrivate = false) {
+    if (includePrivate && !this.key_export_enabled) {
+      throw new ConfigError(
+        'Private descriptor export disabled. Set allow_key_export: true in wallet config.',
+        'allow_key_export',
+        false
+      )
+    }
+    const result = await this.cmd<WalletDescriptors>('listdescriptors', includePrivate)
+    return result.descriptors.map(x => parse_desc_item(x))
   }
 
   // ============================================================
-  // External Signing API
+  // Private Key Export (GATED)
   // ============================================================
 
   /**
-   * Export keypair for an address
+   * Extract private key for an address
    *
-   * @example
-   * const keypair = await wallet.export_keypair(address)
-   * // keypair.type === 'taproot' | 'segwit'
-   * // keypair.seckey - 32-byte private key (hex)
-   * // keypair.pubkey - 32 or 33 byte public key (hex)
+   * @security WARNING: This method returns sensitive private key material.
+   *
+   * This method is GATED and requires explicit opt-in:
+   * ```typescript
+   * const wallet = new CoreWallet(client, 'name', { allow_key_export: true })
+   * ```
+   *
+   * Security requirements:
+   * - Never log, print, or persist the returned seckey
+   * - Clear from memory immediately after use
+   * - Do not transmit over network or store in databases
+   * - Use only for authorized external signing protocols
+   *
+   * Intended use cases:
+   * - FROST threshold signatures
+   * - MuSig2 multi-signatures
+   * - DLCs (Discreet Log Contracts)
+   * - Adaptor signatures
+   * - Other cryptographic protocols requiring raw key access
+   *
+   * For standard transactions, use the RPC-based methods instead:
+   * - send_funds() - Simple sends
+   * - create_psbt() + sign_psbt() - PSBT workflow
+   * - create_and_sign_tx() - One-shot transaction creation
+   *
+   * @param address Bitcoin address to extract key for
+   * @returns ExtractedKey with public key and SENSITIVE private key
+   * @throws Error if allow_key_export is not enabled
+   * @throws Error if address is not in this wallet
    */
-  async export_keypair(address: string): Promise<KeyPair> {
-    const desc_pair = await this.get_descriptor(address)
+  async extract_private_key(address: string): Promise<ExtractedKey> {
+    // Security gate
+    if (!this.key_export_enabled) {
+      throw new ConfigError(
+        'Private key export disabled. ' +
+        'Set allow_key_export: true in wallet config to enable. ' +
+        'This is a security-sensitive operation - only enable if you need ' +
+        'raw key access for external signing protocols (FROST, MuSig2, etc.).',
+        'allow_key_export',
+        false
+      )
+    }
+
+    debug('extracting private key for address (export enabled)')
+
+    // Get address info
     const addr_data = await this.parse_address(address)
-    const parsed = parse_descriptor(addr_data.desc)
+    const addr_desc = parse_descriptor(addr_data.desc)
 
-    const key_type: KeyType = parsed.keytype.includes('tr') ? 'taproot' : 'segwit'
+    // Get private descriptors (we've already checked the gate)
+    const result = await this.cmd<WalletDescriptors>('listdescriptors', true)
+    const wall_xprvs = result.descriptors.map(x => parse_desc_item(x))
+    const addr_xprv = wall_xprvs.find(e => e.label === addr_desc.parent_label)
+
+    if (!addr_xprv) {
+      throw new WalletError(`Address ${address} not found`, this.label, 'extract_private_key')
+    }
+
+    // Derive the child key (NOT the master)
+    const hd_mst = HDKey.fromExtendedKey(addr_xprv.keystr, { private: 70615956, public: 70617039 })
+    const hd_chd = hd_mst.derive(`m${addr_desc.fullpath}`)
+
+    Assert.exists(hd_chd.privateKey, 'Failed to derive private key')
+    Assert.exists(hd_chd.publicKey, 'Failed to derive public key')
+
+    // Determine key type
+    const is_taproot = addr_desc.keytype.includes('tr')
+    const key_type: KeyType = is_taproot ? 'taproot' : 'segwit'
+
+    // Format keys appropriately
+    const seckey = new Buff(hd_chd.privateKey).hex
+    const pubkey = is_taproot
+      ? new Buff(hd_chd.publicKey).slice(1).hex  // 32-byte x-only for taproot
+      : new Buff(hd_chd.publicKey).hex           // 33-byte compressed for segwit
 
     return {
+      address,
       type        : key_type,
-      pubkey      : desc_pair.pubkey,
-      seckey      : desc_pair.seckey,
-      path        : desc_pair.path,
-      fingerprint : desc_pair.mprint,
-      descriptor  : desc_pair.desc
+      pubkey,
+      seckey,
+      path        : addr_desc.fullpath,
+      fingerprint : addr_data.hdmasterfingerprint
     }
   }
 
   /**
-   * Generate new address and export its keypair
+   * Generate a new address and extract its private key
+   *
+   * Convenience method combining generate_address + extract_private_key.
+   * Requires allow_key_export: true in wallet config.
+   *
+   * @param config Address generation config
+   * @returns Object with address and extracted key
    */
-  async generate_keypair(
+  async generate_and_extract_key(
     config?: AddressConfig
-  ): Promise<{ address: string; keypair: KeyPair }> {
+  ): Promise<{ address: string; key: ExtractedKey }> {
     const address = await this.generate_address(config)
-    const keypair = await this.export_keypair(address)
-    return { address, keypair }
-  }
-
-  /**
-   * Build unsigned transaction with pre-computed sighashes
-   *
-   * @example
-   * const unsigned = await wallet.build_tx(template)
-   * // unsigned.sighashes[0].sighash - ready for external signing
-   * // unsigned.sighashes[0].key_type - 'taproot' or 'segwit'
-   */
-  async build_tx(
-    template : TxTemplate,
-    options  : BuildTxOptions = {}
-  ): Promise<UnsignedTx> {
-    const { fee = 1000, sigflag = 0x81, change = true } = options
-
-    const txdata = create_tx(template)
-    const vamt = txdata.vout.reduce((prev: number, curr: any) => Number(curr.value) + prev, 0)
-    const utxos = await this.select_utxos(vamt + fee)
-    const total = utxos.reduce((prev, curr) => curr.sats + prev, 0)
-
-    // Add change output if needed
-    if (change) {
-      const change_amt = total - vamt - fee
-      if (change_amt > DUST_LIMIT) {
-        const change_script = encode_script(await this.generate_script_key())
-        txdata.vout.push({
-          value     : BigInt(change_amt),
-          script_pk : change_script.hex
-        })
-      }
-    }
-
-    // Add inputs and compute sighashes (without signatures)
-    const sighashes: InputSighash[] = []
-    const { hash_segwit_tx, hash_taproot_tx } = (BTC as any).SIGHASH
-
-    for (let i = 0; i < utxos.length; i++) {
-      const { desc, txid, vout, sats, scriptPubKey } = utxos[i]
-      const parsed = parse_descriptor(desc)
-
-      // Determine key type
-      const key_type: KeyType = desc.startsWith('tr') ? 'taproot' : 'segwit'
-
-      // Get public key
-      const xprv = await this.get_xprv(parsed.parent_label)
-      Assert.ok(xprv?.extkey !== undefined)
-      const derived = xprv.extkey.derive('m' + parsed.fullpath)
-      Assert.ok(derived.publicKey !== null)
-
-      const pubkey = key_type === 'taproot'
-        ? new Buff(derived.publicKey).slice(1).hex  // 32-byte x-only
-        : new Buff(derived.publicKey).hex           // 33-byte compressed
-
-      // Add input to transaction
-      const prevout = { value: BigInt(sats), script_pk: scriptPubKey }
-      const txinput = {
-        txid,
-        vout,
-        prevout,
-        coinbase   : null,
-        script_sig : null,
-        sequence   : RBF_SEQUENCE,
-        witness    : []
-      }
-
-      txdata.vin.push(txinput)
-
-      // Compute sighash
-      const sighash_config = { sigflag, pubkey, txinput }
-      const sighash = key_type === 'taproot'
-        ? hash_taproot_tx(txdata, sighash_config)
-        : hash_segwit_tx(txdata, sighash_config)
-
-      sighashes.push({
-        index    : i,
-        sighash,
-        sigflag,
-        key_type,
-        pubkey
-      })
-    }
-
-    // Serialize transaction (with empty witnesses)
-    const { encode_tx } = (BTC as any).TX
-    const tx_hex = encode_tx(txdata).hex
-
-    // Estimate vsize
-    const vsize = this._estimate_vsize(txdata)
-
-    return {
-      tx_hex,
-      sighashes,
-      fee,
-      vsize
-    }
-  }
-
-  /**
-   * Add external signature to transaction
-   */
-  async add_signature(
-    unsigned  : UnsignedTx,
-    signature : ExternalSignature
-  ): Promise<UnsignedTx> {
-    const sighash = unsigned.sighashes.find(s => s.index === signature.index)
-    if (!sighash) {
-      throw new Error(`No input at index ${signature.index}`)
-    }
-
-    // Validate key type matches
-    if (sighash.key_type !== signature.key_type) {
-      throw new Error(`Key type mismatch: input ${signature.index} expects ${sighash.key_type}, got ${signature.key_type}`)
-    }
-
-    // Decode transaction
-    const txdata = decode_tx(unsigned.tx_hex, false)
-
-    // Build witness based on key type
-    const sigflag = signature.sigflag ?? 0x01
-    let sig_with_flag: string
-
-    if (signature.key_type === 'taproot') {
-      // Taproot: 64-byte Schnorr signature
-      // Only append sighash flag if not SIGHASH_DEFAULT (0x00) or SIGHASH_ALL (0x01)
-      if (sigflag === 0x00 || sigflag === 0x01) {
-        sig_with_flag = Buffer.from(signature.signature).toString('hex')
-      } else {
-        const combined = new Uint8Array(signature.signature.length + 1)
-        combined.set(signature.signature)
-        combined[signature.signature.length] = sigflag
-        sig_with_flag = Buffer.from(combined).toString('hex')
-      }
-      txdata.vin[signature.index].witness = [sig_with_flag]
-    } else {
-      // SegWit: DER signature + pubkey
-      if (!signature.pubkey) {
-        throw new Error('SegWit signatures require pubkey')
-      }
-      const combined = new Uint8Array(signature.signature.length + 1)
-      combined.set(signature.signature)
-      combined[signature.signature.length] = sigflag
-      sig_with_flag = Buffer.from(combined).toString('hex')
-      txdata.vin[signature.index].witness = [sig_with_flag, signature.pubkey]
-    }
-
-    const { encode_tx } = (BTC as any).TX
-    return {
-      ...unsigned,
-      tx_hex: encode_tx(txdata).hex
-    }
-  }
-
-  /**
-   * Add multiple signatures at once
-   */
-  async add_signatures(
-    unsigned   : UnsignedTx,
-    signatures : ExternalSignature[]
-  ): Promise<UnsignedTx> {
-    let result = unsigned
-    for (const sig of signatures) {
-      result = await this.add_signature(result, sig)
-    }
-    return result
-  }
-
-  /**
-   * Finalize transaction (returns hex ready for broadcast)
-   */
-  async finalize_tx(unsigned: UnsignedTx): Promise<string> {
-    // Verify all inputs have witnesses
-    const txdata = decode_tx(unsigned.tx_hex, false)
-    for (let i = 0; i < txdata.vin.length; i++) {
-      if (!txdata.vin[i].witness || txdata.vin[i].witness.length === 0) {
-        throw new Error(`Input ${i} is missing signature`)
-      }
-    }
-    return unsigned.tx_hex
-  }
-
-  /**
-   * Create signing context for multi-step workflows
-   *
-   * @example
-   * const ctx = await wallet.create_signing_context(template)
-   * ctx.pending_inputs  // [0, 1, 2]
-   * ctx.add_signature({ index: 0, key_type: 'taproot', signature: sig })
-   * const txhex = await ctx.finalize()
-   */
-  async create_signing_context(
-    template : TxTemplate,
-    options? : BuildTxOptions
-  ): Promise<SigningContext> {
-    const unsigned = await this.build_tx(template, options)
-    return new SigningContext(this, unsigned)
-  }
-
-  /**
-   * Estimate transaction virtual size
-   */
-  private _estimate_vsize(txdata: TxData): number {
-    // Base transaction size (version + locktime + input/output counts)
-    const base = 10
-    // Non-witness input size: 32 txid + 4 vout + 4 sequence + 1 script length
-    const input_base = TXIN_SIZE * txdata.vin.length
-    // Output size (approximation)
-    const output_size = TXO_SIZE * txdata.vout.length
-    // Witness size (approximation): ~26 vbytes per input
-    const witness_size = WIT_VSIZE * txdata.vin.length
-
-    return base + input_base + output_size + witness_size
+    const key = await this.extract_private_key(address)
+    return { address, key }
   }
 
   // ============================================================
-  // Private methods
+  // Funding helpers
+  // ============================================================
+
+  /**
+   * Ensure wallet has at least the specified balance
+   */
+  async ensure_funds(min_bal: number): Promise<void> {
+    const bal = await this.get_balance()
+    if (bal <= min_bal && this.label !== 'faucet') {
+      await this.drain_faucet(min_bal)
+      if (this.network === 'regtest') {
+        await this.client.mine_blocks(1)
+      }
+    }
+  }
+
+  /**
+   * Get funds from the faucet wallet
+   */
+  async drain_faucet(
+    amount: number,
+    address?: string
+  ): Promise<string> {
+    if (address === undefined) {
+      address = await this.generate_address()
+    }
+    if (!this.client.core?.faucet) {
+      throw new WalletError('No faucet available', this.label, 'drain_faucet')
+    }
+    const faucet = this.client.core.faucet
+    const balance = await faucet.get_balance()
+    if (balance <= amount + 10000) {
+      if (this.network !== 'regtest') {
+        throw new WalletError('Faucet has insufficient funds', 'faucet', 'drain_faucet')
+      } else {
+        const mine_addr = await faucet.get_address('faucet')
+        await this.client.mine_blocks(100, mine_addr)
+      }
+    }
+
+    return faucet.send_funds(amount, address, true)
+  }
+
+  // ============================================================
+  // PSBT Helpers (for advanced PSBT manipulation)
+  // ============================================================
+
+  /**
+   * Add segwit descriptor to PSBT input
+   */
+  async add_segwit_desc(
+    psbt: string,
+    pubkey: string,
+    index: number
+  ): Promise<string> {
+    const addr = P2WPKH.create_address(pubkey, this.network as Network)
+    const desc = await this.parse_address(addr)
+    const pdata = Transaction.fromPSBT(Buffer.from(psbt, 'base64'))
+    const der = {
+      fingerprint: Buff.hex(desc.hdmasterfingerprint).num,
+      path: bip32Path(desc.hdkeypath.replace(/h/g, '\''))
+    }
+    pdata.updateInput(index, { bip32Derivation: [[new Buff(pubkey), der]] })
+    return Buffer.from(pdata.toPSBT(0)).toString('base64')
+  }
+
+  /**
+   * Add taproot descriptor to PSBT input
+   */
+  async add_taproot_desc(
+    psbt: string,
+    pubkey: string,
+    index: number,
+    scripts: string[] = [],
+    version = TAPROOT_VERSION
+  ): Promise<string> {
+    const { encode_tapscript } = (BTC as any).TAPROOT
+    const tweak_result = encode_taptweak(pubkey)
+    const tapkey = tweak_result.slice(1).hex
+    const addr = P2TR.create_address(tapkey, this.network as Network)
+    const desc = await this.parse_address(addr)
+    const pdata = Transaction.fromPSBT(Buffer.from(psbt, 'base64'))
+    const hashes = scripts.map(e => encode_tapscript(e, version).uint)
+    const der = {
+      fingerprint: Buff.hex(desc.hdmasterfingerprint).num,
+      path: bip32Path(desc.hdkeypath.replace(/h/g, '\''))
+    }
+    pdata.updateInput(index, { tapBip32Derivation: [[new Buff(pubkey), { hashes, der }]] })
+    return Buffer.from(pdata.toPSBT(0)).toString('base64')
+  }
+
+  // ============================================================
+  // Internal methods
   // ============================================================
 
   async _create() {
@@ -908,7 +769,7 @@ export class CoreWallet {
     const res = await this.client.cmd<WalletResponse>('createwallet', payload)
     const err = (res.warning !== undefined && res.warning !== '')
     if (err || res.name !== this.label) {
-      throw new Error(`Wallet failed to create: ${JSON.stringify(res, null, 2)}`)
+      throw new WalletError('Wallet creation failed', this.label, '_create')
     }
   }
 
@@ -916,7 +777,7 @@ export class CoreWallet {
     debug('loading wallet: %s', this.label)
     const res = await this.client.cmd<WalletResponse>('loadwallet', this.label)
     if (res.warning !== undefined || res.name !== this.label) {
-      throw new Error(`Wallet failed to load: ${JSON.stringify(res, null, 2)}`)
+      throw new WalletError('Wallet load failed', this.label, '_load')
     }
   }
 

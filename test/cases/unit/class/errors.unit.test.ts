@@ -2,8 +2,7 @@
  * Unit tests for error classes
  */
 
-import type { TestFunction as TapeTest } from 'tape'
-import type { MockTestContext } from '../../../lib/types/test.types.js'
+import type { TapeHarness, MockTestContext } from '../../../lib/types/test.types.js'
 import {
   CoreError,
   ProcessError,
@@ -19,7 +18,7 @@ import {
  * Error classes unit tests
  */
 export default function errors_unit_tests(
-  tape: TapeTest,
+  tape: TapeHarness,
   _ctx: MockTestContext
 ): void {
   tape('CoreError - base class', (t) => {
@@ -174,7 +173,7 @@ export default function errors_unit_tests(
     const error = new CoreError('Test error')
 
     t.ok(error.stack, 'Stack trace exists')
-    t.ok(error.stack!.includes('CoreError'), 'Stack includes error name')
+    t.ok(error.stack?.includes('CoreError'), 'Stack includes error name')
 
     t.end()
   })

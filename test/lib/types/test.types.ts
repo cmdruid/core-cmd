@@ -2,14 +2,10 @@
  * Test type definitions for core-cmd test framework
  */
 
-import type { Test } from 'tape'
 import type {
   CoreDaemon,
   CoreClient,
   CoreWallet,
-  DaemonState,
-  UTXO,
-  TxResult
 } from '../../../src/index.js'
 import type { MockCoreClient } from '../mocks/client.mock.js'
 import type { MockCoreWallet } from '../mocks/wallet.mock.js'
@@ -51,10 +47,15 @@ export type TestContext = MockTestContext | DaemonTestContext
 // ============================================================================
 
 /**
+ * Type alias for the tape test harness function
+ */
+export type TapeHarness = typeof import('tape')
+
+/**
  * Test function signature - receives tape module and context
  */
 export type TestFunction = (
-  tape : typeof import('tape'),
+  tape : TapeHarness,
   ctx  : TestContext
 ) => void | Promise<void>
 
@@ -131,7 +132,7 @@ export interface TestResults {
  * CI test results with additional metadata
  */
 export interface CITestResults extends TestResults {
-  environment : 'github' | 'gitlab' | 'local'
+  environment : 'github' | 'gitlab' | 'jenkins' | 'circle' | 'local'
   suites      : {
     unit?        : TestResults
     integration? : TestResults
@@ -167,8 +168,9 @@ export interface BaseRunnerConfig {
  * Unit test runner configuration
  */
 export interface UnitRunnerConfig extends BaseRunnerConfig {
-  timeout_ms?   : number  // default: 5_000
-  glob_pattern? : string  // default: 'test/unit/**/*.test.ts'
+  timeout_ms?   : number   // default: 5_000
+  glob_pattern? : string   // default: 'test/unit/**/*.test.ts'
+  verbose?      : boolean  // default: false
 }
 
 /**
@@ -191,6 +193,8 @@ export interface IntegrationRunnerConfig extends BaseRunnerConfig {
 export interface E2ERunnerConfig extends BaseRunnerConfig {
   timeout_ms?   : number  // default: 120_000
   glob_pattern? : string  // default: 'test/e2e/**/*.test.ts'
+  /** Core daemon configuration overrides */
+  core_config?  : Record<string, unknown>
 }
 
 /**

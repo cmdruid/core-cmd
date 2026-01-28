@@ -2,7 +2,7 @@
  * Mock implementation of ProcessController for unit testing
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import type { MockProcessControllerConfig, RecordedCall } from '../types/mock.types.js'
 import { create_call_recorder } from '../types/mock.types.js'
 import { create_mock_client, MockCoreClient } from './client.mock.js'

@@ -2,7 +2,7 @@
  * Mock implementation of CoreClient for unit testing
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import type {
   MockClientConfig,
   RecordedCall,
@@ -214,9 +214,9 @@ export class MockCoreClient extends EventEmitter {
     if (tx.confirmations && tx.confirmations > 0) {
       return {
         confirmed    : true,
-        block_hash   : tx.blockhash,
+        block_hash   : tx.blockhash ?? '',
         block_height : tx.confirmations, // Simplified
-        block_time   : tx.blocktime
+        block_time   : tx.blocktime ?? 0
       }
     }
     return { confirmed: false }

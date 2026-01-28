@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2026-01-27
+## [2.0.0] - 2026-01-28
 
 ### Added
 
@@ -16,18 +16,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New events: `block`, `transaction`, `events:error`
   - Configuration: `events_enabled`, `events_poll_interval`, `polling_enabled`
 
-- **External Signing API**: Support for FROST, MuSig2, DLCs, and adaptor signatures
-  - `SigningContext`: State management for multi-step signing workflows
+- **External Signing API**: Support for hardware wallets, FROST, MuSig2, DLCs
   - `wallet.export_keypair()`: Export keys for external signing
   - `wallet.build_tx()`: Build transactions with pre-computed sighashes
   - `wallet.add_signature()`: Add external signatures to transactions
-  - `wallet.create_signing_context()`: Create managed signing workflows
+  - `wallet.finalize_tx()`: Finalize externally signed transactions
 
-- **Unit Test Framework**: Comprehensive test infrastructure
+- **Comprehensive Documentation**
+  - `docs/ARCHITECTURE.md`: System design, components, state machine
+  - `docs/API.md`: Complete API reference
+  - `docs/GUIDE.md`: Usage tutorials, patterns, best practices
+  - Rewritten `README.md` with quick start and API overview
+
+- **Unit Test Framework**: Test infrastructure without Bitcoin Core
   - Mock implementations for `CoreClient`, `CoreWallet`, `CoreDaemon`
-  - Test helpers and fixtures
-  - Separate runners for unit, integration, and e2e tests
-  - CI-friendly: `npm run test:unit` requires no Bitcoin Core
+  - Test helpers, fixtures, and builders
+  - Separate runners: `test:unit`, `test:integration`, `test:e2e`
+  - 640+ unit test assertions
+
+- **Typed Error Classes**: Comprehensive error hierarchy
+  - `ProcessError`: Bitcoin Core process failures
+  - `CommandError`: bitcoin-cli execution failures
+  - `ConnectionError`: RPC connection issues
+  - `WalletError`: Wallet operation failures
+  - `ConfigError`: Configuration validation errors
+  - `NetworkError`: Network-related errors
+
+- **Isolated Mode**: Random port assignment for parallel test execution
+  - Uses random RPC port to avoid conflicts
+  - Disables P2P listening (`-listen=0`)
 
 - **MIT License**: Added LICENSE file
 
@@ -37,16 +54,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Architecture Refactor**: Moved classes from `src/lib/` to `src/class/`
 - **API Convention**: All public methods now use `snake_case` (camelCase deprecated)
 - **CI Workflow**: Updated to npm (from yarn), Node 20.x/22.x
+- **Error Handling**: Replaced generic `Error` throws with typed error classes
 
 ### Removed
 
-- **Schema Placeholder**: Removed empty `src/schema/` directory
+- **SigningContext class**: Simplified external signing to wallet methods
+- **Schema placeholder**: Removed empty `src/schema/` directory
+- **Legacy tests**: Removed deprecated test runners
 - **yarn.lock**: Switched to npm (package-lock.json)
 
 ### Breaking Changes
 
 - Package name changed from `@cmdcode/core-cmd` to `@vbyte/core-cmd`
 - Import paths changed (internal refactoring)
+- `SigningContext` removed - use `wallet.build_tx()` and `wallet.add_signature()` directly
 - Legacy camelCase methods are deprecated (still work but will warn)
 
 ### Migration from v1.x
@@ -62,6 +83,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - await wallet.getBalance()
 + await wallet.get_balance()
+
+// External signing (SigningContext removed)
+- const ctx = await wallet.create_signing_context(template)
+- ctx.add_signature({ index, signature })
+- const hex = await ctx.finalize()
++ const unsigned = await wallet.build_tx(template)
++ const signed = await wallet.add_signature(unsigned, { index, signature })
++ const hex = await wallet.finalize_tx(signed)
 ```
 
 ## [1.6.5] - Previous Release

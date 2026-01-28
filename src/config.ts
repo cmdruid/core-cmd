@@ -1,8 +1,14 @@
-import { resolve, join } from 'path'
-import { homedir } from 'os'
-import { CmdConfig, CoreConfig, NetworkName } from './types/config.js'
-import { NETWORK_ALIASES, DEFAULT_TIMEOUT_MS } from './const.js'
-import { init_debug } from './util/debug.js'
+// External dependencies
+import { resolve, join, normalize } from 'node:path'
+import { homedir }                   from 'node:os'
+
+// Internal modules
+import { ConfigError }                        from '@/class/errors.js'
+import { NETWORK_ALIASES, DEFAULT_TIMEOUT_MS } from '@/const.js'
+import { init_debug }                         from '@/util/debug.js'
+
+// Type imports
+import type { CmdConfig, CoreConfig, NetworkName } from '@/types/config.js'
 
 /**
  * Default core configuration values
@@ -15,7 +21,6 @@ export const CORE_DEFAULTS: CoreConfig = {
   safemode: true,
   no_spawn: false,
   timeout: DEFAULT_TIMEOUT_MS,
-  use_cache: true,
   verbose: true,
   params: [],
   core_params: [],
@@ -26,15 +31,42 @@ export const CORE_DEFAULTS: CoreConfig = {
  * Default command configuration values
  */
 export const CMD_DEFAULTS: CmdConfig = {
-  cache: false,
   params: []
 }
 
 /**
+ * Characters that are dangerous in paths (shell metacharacters)
+ */
+const DANGEROUS_PATH_CHARS = /[;&|`$(){}[\]<>!\\*?\n\r\t]/
+
+/**
  * Resolve a path, expanding ~ and making it absolute
+ *
+ * Security checks:
+ * - Rejects shell metacharacters
+ * - Normalizes path to prevent traversal after resolution
+ *
+ * @param path - Path string to resolve
+ * @returns Resolved absolute path or undefined
+ * @throws ConfigError if path contains dangerous characters
  */
 export function resolve_path(path?: string): string | undefined {
   if (!path) return undefined
+
+  // Check for dangerous characters that could cause issues
+  // Note: We allow quotes (') and (") as they may be in valid Windows paths
+  // We also allow backslash on Windows
+  const dangerousChars = process.platform === 'win32'
+    ? /[;&|`$(){}[\]<>!\n\r\t]/
+    : DANGEROUS_PATH_CHARS
+
+  if (dangerousChars.test(path)) {
+    throw new ConfigError(
+      'Path contains invalid characters',
+      'path',
+      path
+    )
+  }
 
   // Expand ~ to home directory
   if (path.startsWith('~')) {
@@ -50,6 +82,10 @@ export function resolve_path(path?: string): string | undefined {
   if (!path.startsWith('/') && !path.match(/^[A-Z]:\\/i)) {
     path = resolve(process.cwd(), path)
   }
+
+  // Normalize to resolve any remaining . or .. segments
+  // This is safe because we've already made the path absolute
+  path = normalize(path)
 
   return path
 }

@@ -1,33 +1,34 @@
-import { EventEmitter } from '@vbyte/util'
-import { sleep } from '@vbyte/util'
-import { create_core_debug } from '../util/debug.js'
-import { CoreClient } from './client.js'
-import { core_config } from '../config.js'
-import { CoreWallet } from './wallet.js'
+// External dependencies
+import { EventEmitter, sleep } from '@vbyte/util'
+
+// Internal modules
+import * as CONST                from '@/const.js'
+import { core_config }           from '@/config.js'
+import { check_process }         from '@/lib/cmd.js'
+import { create_core_debug }     from '@/util/debug.js'
+import { CoreClient }            from '@/class/client.js'
+import { CoreWallet }            from '@/class/wallet.js'
+import { ProcessError, WalletError } from '@/class/errors.js'
+import { DaemonStateMachine, DaemonState, StateChangeEvent } from '@/class/state.js'
+import { ZMQEventBus, BlockEvent, TransactionEvent, SequenceEvent } from '@/class/zmq.js'
+import { createEventBus, startEventBus, stopEventBus, EventBus, EventBusType } from '@/class/events.js'
 import {
   ProcessController,
   SpawnedProcess,
   ConnectedProcess,
   ProcessState
-} from './process.js'
-import { check_process } from '../lib/cmd.js'
-import { DaemonStateMachine, DaemonState } from './state.js'
-import { ZMQEventBus, BlockEvent, TransactionEvent, SequenceEvent } from './zmq.js'
-import { createEventBus, startEventBus, stopEventBus, EventBus, EventBusType } from './events.js'
-import { ProcessError } from './errors.js'
-import { StateChangeEvent } from './state.js'
+} from '@/class/process.js'
 
-import {
+// Type imports
+import type {
   CoreConfig,
   CoreEvent,
   RunMethod
-} from '../types/index.js'
-
-import * as CONST from '../const.js'
+} from '@/types/index.js'
 
 const debug = create_core_debug('daemon')
 
-const { FALLBACK_FEE, FAUCET_MIN_BAL, INIT_BLOCK_CT, SAT_MULTI, RANDOM_PORT } = CONST
+const { FALLBACK_FEE, FAUCET_MIN_BAL, INIT_BLOCK_CT, SAT_MULTI } = CONST
 
 export class CoreDaemon extends EventEmitter<CoreEvent> {
   readonly _client: CoreClient
@@ -177,7 +178,7 @@ export class CoreDaemon extends EventEmitter<CoreEvent> {
 
   get faucet(): CoreWallet {
     if (this._faucet === null) {
-      throw new Error('Faucet wallet is not loaded!')
+      throw new WalletError('Faucet wallet is not loaded', 'faucet', 'get_faucet')
     }
     return this._faucet
   }
@@ -293,7 +294,7 @@ export class CoreDaemon extends EventEmitter<CoreEvent> {
     debug.info('faucet balance: %d sats', bal)
 
     if (bal <= min_bal) {
-      throw new Error('faucet is broke!')
+      throw new WalletError('Faucet has insufficient funds', 'faucet', '_init')
     }
 
     await Promise.all(this.tasks.map(t => t(this.client)))
@@ -392,7 +393,7 @@ export class CoreDaemon extends EventEmitter<CoreEvent> {
       }
 
       // Stop event bus if running
-      if (this._events && this._events.is_connected()) {
+      if (this._events?.is_connected()) {
         await stopEventBus(this._events)
       }
 
@@ -470,18 +471,18 @@ export class CoreDaemon extends EventEmitter<CoreEvent> {
 function prepare_config(config?: Partial<CoreConfig>): CoreConfig {
   const opt = core_config(config)
 
-  if (opt.isolated) {
-    const port = RANDOM_PORT()
-    opt.peer_port = port
-    opt.rpc_port = port + 1
-  }
-
   if (opt.network === 'bitcoin') {
     opt.network = 'main'
   }
 
   if (opt.network === 'testnet') {
     opt.network = 'test'
+  }
+
+  // Isolated mode: use random RPC port to avoid conflicts with other instances
+  if (opt.isolated && opt.rpc_port === undefined) {
+    opt.rpc_port = CONST.randomPort()
+    debug('isolated mode: using random RPC port %d', opt.rpc_port)
   }
 
   return opt
@@ -494,6 +495,11 @@ function build_params(opt: CoreConfig): string[] {
     ...opt.params,
     ...opt.core_params
   ]
+
+  // Isolated mode: disable P2P listening to avoid port conflicts
+  if (opt.isolated) {
+    params.push('-listen=0')
+  }
 
   if (opt.peer_port !== undefined) {
     params.push(`-port=${opt.peer_port}`)

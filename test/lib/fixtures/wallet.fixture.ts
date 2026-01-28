@@ -12,7 +12,7 @@ import type { WalletFixtureData, UTXOFixtureData, FullWalletFixture } from '../t
 
 const SAMPLE_TXID = 'a'.repeat(64)
 const SAMPLE_ADDRESS = 'bcrt1qw508d6qejxtdg4y5r3zarvary0c5xw7kygt080'
-const SAMPLE_SCRIPT_PUBKEY = '0014' + '0'.repeat(40)
+const SAMPLE_SCRIPT_PUBKEY = `0014${'0'.repeat(40)}`
 
 // ============================================================================
 // UTXO Fixtures
@@ -203,8 +203,8 @@ export function create_full_wallet_fixture(
   const utxos = [create_utxo_fixture({ sats: balance })]
   const addresses = [
     SAMPLE_ADDRESS,
-    'bcrt1qmock1' + 'a'.repeat(31),
-    'bcrt1qmock2' + 'b'.repeat(31)
+    `bcrt1qmock1${'a'.repeat(31)}`,
+    `bcrt1qmock2${'b'.repeat(31)}`
   ]
 
   return {

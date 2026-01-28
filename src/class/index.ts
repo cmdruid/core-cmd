@@ -1,7 +1,7 @@
 // Core classes
-export { CoreDaemon } from './core.js'
-export { CoreClient } from './client.js'
-export { CoreWallet } from './wallet.js'
+export { CoreDaemon } from '@/class/core.js'
+export { CoreClient } from '@/class/client.js'
+export { CoreWallet } from '@/class/wallet.js'
 
 // Process management
 export {
@@ -10,7 +10,7 @@ export {
   ConnectedProcess,
   ManagedProcess,
   type ProcessController
-} from './process.js'
+} from '@/class/process.js'
 
 // State machine
 export {
@@ -18,7 +18,7 @@ export {
   DaemonStateMachine,
   type StateChangeEvent,
   type StateMachineEvents
-} from './state.js'
+} from '@/class/state.js'
 
 // Error classes
 export {
@@ -31,7 +31,7 @@ export {
   ConfigError,
   NetworkError,
   create_command_error
-} from './errors.js'
+} from '@/class/errors.js'
 
 // ZMQ event bus
 export {
@@ -44,7 +44,7 @@ export {
   type BlockEvent,
   type TransactionEvent,
   type SequenceEvent
-} from './zmq.js'
+} from '@/class/zmq.js'
 
 // Polling event bus
 export {
@@ -52,7 +52,7 @@ export {
   create_poll_event_bus,
   type PollConfig,
   type PollEvents
-} from './poll.js'
+} from '@/class/poll.js'
 
 // Event bus factory
 export {
@@ -62,7 +62,7 @@ export {
   type EventBus,
   type EventBusType,
   type EventBusResult
-} from './events.js'
+} from '@/class/events.js'
 
-// Signing context
-export { SigningContext } from './signing.js'
+// Wallet types
+export type { KeyType, ExtractedKey, PsbtOptions, PsbtResult } from '@/class/wallet.js'

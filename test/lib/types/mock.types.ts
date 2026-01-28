@@ -2,7 +2,7 @@
  * Mock configuration types for core-cmd test framework
  */
 
-import type { CoreConfig, UTXO, DaemonState } from '../../../src/index.js'
+import type { CoreConfig, DaemonState } from '../../../src/index.js'
 
 // ============================================================================
 // Mock Client Types

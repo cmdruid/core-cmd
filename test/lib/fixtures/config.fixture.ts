@@ -112,7 +112,6 @@ export function create_full_config(
     // Flags
     debug     : true,
     verbose   : true,
-    use_cache : true,
     safemode  : true,
     no_spawn  : false,
 

@@ -2,7 +2,7 @@
  * Mock implementation of CoreDaemon for unit testing
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import { DaemonState } from '../../../src/index.js'
 import type { MockDaemonConfig, RecordedCall } from '../types/mock.types.js'
 import type { CoreConfig } from '../../../src/index.js'
@@ -334,56 +334,56 @@ export class MockCoreDaemon extends EventEmitter {
 // ============================================================================
 
 /**
- * Factory for creating pre-configured mock daemons
+ * Factory functions for creating pre-configured mock daemons
  */
-export class MockDaemonFactory {
+export const MockDaemonFactory = {
   /**
    * Create a daemon that is already in the Ready state
    */
-  static async ready(config?: MockDaemonConfig): Promise<MockCoreDaemon> {
+  async ready(config?: MockDaemonConfig): Promise<MockCoreDaemon> {
     const daemon = new MockCoreDaemon({
       ...config,
       initial_state: DaemonState.Created
     })
     await daemon.startup()
     return daemon
-  }
+  },
 
   /**
    * Create a daemon in Error state
    */
-  static errored(error: Error, config?: MockDaemonConfig): MockCoreDaemon {
+  errored(error: Error, config?: MockDaemonConfig): MockCoreDaemon {
     const daemon = new MockCoreDaemon({
       ...config,
       initial_state: DaemonState.Error
     })
     daemon._state_machine._force_state(DaemonState.Error, error)
     return daemon
-  }
+  },
 
   /**
    * Create an uninitialized daemon (Created state)
    */
-  static uninitialized(config?: MockDaemonConfig): MockCoreDaemon {
+  uninitialized(config?: MockDaemonConfig): MockCoreDaemon {
     return new MockCoreDaemon({
       ...config,
       initial_state: DaemonState.Created
     })
-  }
+  },
 
   /**
    * Create a stopped daemon
    */
-  static stopped(config?: MockDaemonConfig): MockCoreDaemon {
+  stopped(config?: MockDaemonConfig): MockCoreDaemon {
     const daemon = new MockCoreDaemon(config)
     daemon._force_state(DaemonState.Stopped)
     return daemon
-  }
+  },
 
   /**
    * Create a daemon with custom faucet balance
    */
-  static async with_balance(balance: number, config?: MockDaemonConfig): Promise<MockCoreDaemon> {
+  async with_balance(balance: number, config?: MockDaemonConfig): Promise<MockCoreDaemon> {
     const daemon = await MockDaemonFactory.ready({
       ...config,
       faucet_balance: balance

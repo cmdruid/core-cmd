@@ -73,7 +73,7 @@ export function verify_standard_sequence(
   message?    : string
 ): void {
   const expected = STATE_SEQUENCES[sequenceName]
-  verify_state_sequence(t, history, expected as DaemonState[], message)
+  verify_state_sequence(t, history, expected as unknown as DaemonState[], message)
 }
 
 /**

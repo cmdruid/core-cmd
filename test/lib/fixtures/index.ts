@@ -85,6 +85,21 @@ export {
   create_platform_config
 } from './config.fixture.js'
 
+// Descriptor fixtures
+export {
+  VALID_DESCRIPTORS,
+  MAINNET_DESCRIPTORS,
+  INVALID_DESCRIPTORS,
+  SHORT_PATH_DESCRIPTORS,
+  VALID_SEGMENTS,
+  INVALID_SEGMENTS,
+  EXPECTED_PARSE_RESULTS,
+  create_descriptor_item_fixture,
+  create_descriptor_set_fixture,
+  create_descriptor_fixture,
+  create_raw_pubkey_descriptor_fixture
+} from './descriptor.fixture.js'
+
 // Re-export types from fixture.types.ts
 export type {
   RPCResponseFixtures,

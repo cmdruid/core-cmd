@@ -153,7 +153,7 @@ export async function poll_with_result<T>(
           timed_out : false
         }
       }
-    } catch (err) {
+    } catch (_err) {
       // Ignore errors and continue polling
       // The caller can use the until predicate to handle errors
     }
@@ -223,7 +223,7 @@ export async function wait_for_confirmation(
   options : ConfirmationOptions = {}
 ): Promise<TxStatus> {
   const {
-    confirmations = DEFAULT_CONFIRMATION_OPTIONS.confirmations,
+    confirmations: _confirmations = DEFAULT_CONFIRMATION_OPTIONS.confirmations,
     interval_ms = DEFAULT_CONFIRMATION_OPTIONS.interval_ms,
     timeout_ms = DEFAULT_CONFIRMATION_OPTIONS.timeout_ms,
     on_check

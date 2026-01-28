@@ -144,7 +144,7 @@ export function create_extended_daemon_context(daemon: CoreDaemon): DaemonTestCo
     /**
      * Wait for a transaction to be confirmed
      */
-    async wait_for_confirmation(txid: string, confirmations: number = 1): Promise<void> {
+    async wait_for_confirmation(_txid: string, confirmations: number = 1): Promise<void> {
       if (confirmations > 0) {
         await base.client.mine_blocks(confirmations)
       }

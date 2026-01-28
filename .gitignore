@@ -3,4 +3,5 @@ dist
 node_modules
 *.log
 .env*
+test/bin
 test/data

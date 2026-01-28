@@ -1,19 +1,6 @@
 /**
  * Test helpers barrel export
- *
- * This module extends the existing test/helpers.ts with additional utilities
  */
-
-// Re-export from existing helpers
-export {
-  expectError,
-  expectErrorType,
-  withDaemon,
-  sleep,
-  retry,
-  tapeHelpers,
-  type TestContext as LegacyTestContext
-} from '../helpers.js'
 
 // Assertions
 export {
@@ -27,14 +14,12 @@ export {
   type AssertionHelpers
 } from './assertions.js'
 
-// Context
+// Context (is_daemon_context and is_mock_context are exported from types/)
 export {
   create_mock_context,
   create_configured_mock_context,
   create_daemon_context,
   create_extended_daemon_context,
-  is_daemon_context,
-  is_mock_context,
   get_client,
   get_wallet,
   get_daemon,
@@ -67,9 +52,8 @@ export {
   type Spy
 } from './mock.utils.js'
 
-// State utilities
+// State utilities (verify_state_sequence, get_visited_states, STATE_SEQUENCES are exported from mocks/)
 export {
-  verify_state_sequence,
   verify_standard_sequence,
   verify_startup_sequence,
   verify_shutdown_sequence,
@@ -79,7 +63,6 @@ export {
   assert_state_visited,
   assert_state_not_visited,
   assert_transition_count,
-  get_visited_states,
   get_final_state,
   get_initial_state,
   count_transitions_to,
@@ -87,6 +70,5 @@ export {
   get_state_transitions,
   has_error_transition,
   get_error_transitions,
-  get_state_durations,
-  STATE_SEQUENCES
+  get_state_durations
 } from './state.utils.js'

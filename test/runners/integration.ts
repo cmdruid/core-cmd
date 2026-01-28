@@ -4,7 +4,7 @@
 
 import tape from 'tape'
 import { glob } from 'glob'
-import { pathToFileURL } from 'url'
+import { pathToFileURL } from 'node:url'
 import { CoreDaemon } from '../../src/index.js'
 import { create_daemon_context } from '../lib/helpers/context.js'
 import {
@@ -99,7 +99,7 @@ export async function run_integration_tests(
           ctx = create_daemon_context(daemon)
         }
 
-        await run_test_file(testFile, ctx!, results)
+        if (ctx) await run_test_file(testFile, ctx, results)
 
         // Shutdown per-test daemon
         if (!reuse_daemon && daemon) {

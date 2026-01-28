@@ -2,7 +2,7 @@
  * Mock implementation of CoreWallet for unit testing
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import type { MockWalletConfig, MockUTXOData, RecordedCall } from '../types/mock.types.js'
 import type { UTXO, WalletInfo } from '../../../src/index.js'
 import { create_call_recorder } from '../types/mock.types.js'
@@ -176,12 +176,12 @@ export class MockCoreWallet extends EventEmitter {
 
   async get_pubkey(_address: string): Promise<string> {
     this._record_call('get_pubkey', [_address])
-    return '02' + 'c'.repeat(64)
+    return `02${'c'.repeat(64)}`
   }
 
   async generate_pubkey(_config?: unknown): Promise<string> {
     this._record_call('generate_pubkey', [_config])
-    return '02' + 'c'.repeat(64)
+    return `02${'c'.repeat(64)}`
   }
 
   async get_descriptor(_address: string): Promise<unknown> {
@@ -190,7 +190,7 @@ export class MockCoreWallet extends EventEmitter {
       desc   : 'wpkh([fingerprint/84h/1h/0h]tpubkey/0/*)#checksum',
       mprint : 'mock_fingerprint',
       path   : "84'/1'/0'/0",
-      pubkey : '02' + 'c'.repeat(64),
+      pubkey : `02${'c'.repeat(64)}`,
       seckey : 'd'.repeat(64),
       master : 'tprv...'
     }

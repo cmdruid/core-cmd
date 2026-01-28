@@ -6,11 +6,16 @@
  * is not installed.
  */
 
-import { EventEmitter } from '@vbyte/util'
-import { create_core_debug } from '../util/debug.js'
-import { CoreConfig } from '../types/index.js'
-import { NetworkError } from './errors.js'
-import { hash256 } from '../util/crypto.js'
+// External dependencies
+import { EventEmitter }      from '@vbyte/util'
+
+// Internal modules
+import { NetworkError }      from '@/class/errors.js'
+import { hash256 }           from '@/util/crypto.js'
+import { create_core_debug } from '@/util/debug.js'
+
+// Type imports
+import type { CoreConfig }   from '@/types/index.js'
 
 const debug = create_core_debug('zmq')
 
@@ -145,10 +150,9 @@ export class ZMQEventBus extends EventEmitter<ZMQEvents> {
     // Try to dynamically import zeromq
     let zmq: any
     try {
-      // @ts-ignore - zeromq is an optional dependency
       zmq = await import('zeromq')
       debug('zeromq package loaded')
-    } catch (err) {
+    } catch {
       throw new NetworkError(
         'ZMQ support requires the zeromq package. Install with: npm install zeromq'
       )
@@ -295,7 +299,6 @@ export class ZMQEventBus extends EventEmitter<ZMQEvents> {
     if (!this.connected) return
 
     try {
-      // @ts-ignore - zeromq is an optional dependency
       const zmq = await import('zeromq')
       const endpoint = `${this.config.zmq_host}:${this.config.zmq_port}`
 
@@ -349,10 +352,11 @@ export class ZMQEventBus extends EventEmitter<ZMQEvents> {
         } as TransactionEvent)
         break
 
-      case ZMQTopic.Sequence:
+      case ZMQTopic.Sequence: {
         const seq = this._parse_sequence(data)
         this.emit('sequence', seq)
         break
+      }
     }
   }
 
@@ -441,7 +445,6 @@ export class ZMQEventBus extends EventEmitter<ZMQEvents> {
  */
 export async function is_zmq_available(): Promise<boolean> {
   try {
-    // @ts-ignore - zeromq is an optional dependency
     await import('zeromq')
     return true
   } catch {

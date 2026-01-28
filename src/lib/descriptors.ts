@@ -1,16 +1,20 @@
+// External dependencies
 import { HDKey } from '@scure/bip32'
-import { Buff } from '@vbyte/buff'
-import { hash160 } from '../util/crypto.js'
-import { is_uint }      from './util.js'
-import { TESTNET_VERSIONS, MAINNET_VERSIONS } from '../const.js'
+import { Buff }  from '@vbyte/buff'
 
-import {
+// Internal modules
+import { hash160 }                           from '@/util/crypto.js'
+import { is_uint }                           from '@/lib/util.js'
+import { TESTNET_VERSIONS, MAINNET_VERSIONS } from '@/const.js'
+
+// Type imports
+import type {
   DescriptorData,
   DescriptorItem,
   DescriptorMeta
-} from '../types/index.js'
+} from '@/types/index.js'
 
-const DESC_REGEX = /^(?<keytype>[\w\(]+)\((?:\[(?<parent_label>[0-9a-zA-Z]+)(?<parent_path>[0-9h\/\'\*]+)\]*)*(?<keystr>\w+)+((?<path>\/[0-9h\/\'\*]+)(\/\*)*)*\)+#(?<checksum>\w+)$/
+const DESC_REGEX = /^(?<keytype>[\w(]+)\((?:\[(?<parent_label>[0-9a-zA-Z]+)(?<parent_path>[0-9h/'*]+)\]*)*(?<keystr>\w+)+((?<path>\/[0-9h/'*]+)(\/\*)*)*\)+#(?<checksum>\w+)$/
 
 export function parse_desc_item (
  item : DescriptorItem
@@ -22,10 +26,16 @@ export function parse_desc_item (
 export function parse_descriptor (
   desc : string
 ) : DescriptorMeta {
+  // Quick pre-check to avoid catastrophic backtracking on invalid inputs
+  // Descriptor must contain # for checksum
+  if (!desc.includes('#')) {
+    throw new Error(`Unable to parse descriptor (missing checksum): ${desc}`)
+  }
+
   const matches = desc.match(DESC_REGEX)
 
   if (matches === null) {
-    throw new Error('Unable to parse descriptor:' + desc)
+    throw new Error(`Unable to parse descriptor: ${desc}`)
   }
 
   let { keytype, keystr, path, parent_path, parent_label, checksum } = matches.groups ?? {}
@@ -115,7 +125,7 @@ export function parse_segment (segment : string) {
   }
   // Check if the remaining value is a number.
   if (!is_uint(segment)) {
-    throw new Error('invalid descriptor path segment: ' + segment)
+    throw new Error(`invalid descriptor path segment: ${segment}`)
   }
   // Return the proper number value.
   return (hardened)

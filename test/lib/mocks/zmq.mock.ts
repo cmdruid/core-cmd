@@ -2,7 +2,7 @@
  * Mock implementation of ZMQ event bus for unit testing
  */
 
-import { EventEmitter } from 'events'
+import { EventEmitter } from 'node:events'
 import type { MockZMQConfig, MockZMQEvent, RecordedCall } from '../types/mock.types.js'
 import { create_call_recorder } from '../types/mock.types.js'
 

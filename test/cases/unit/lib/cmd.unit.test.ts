@@ -2,15 +2,14 @@
  * Unit tests for CoreClient mock and cmd functionality
  */
 
-import type { TestFunction as TapeTest } from 'tape'
-import type { MockTestContext } from '../../../lib/types/test.types.js'
+import type { TapeHarness, MockTestContext } from '../../../lib/types/test.types.js'
 import { create_mock_client } from '../../../lib/mocks/client.mock.js'
 
 /**
  * CoreClient mock unit tests
  */
 export default function cmd_unit_tests(
-  tape: TapeTest,
+  tape: TapeHarness,
   _ctx: MockTestContext
 ): void {
   tape('Mock client - basic RPC call', async (t) => {
@@ -177,11 +176,11 @@ export default function cmd_unit_tests(
 
     const tx = await client.get_tx(txid)
     t.ok(tx, 'Returns transaction')
-    t.equal(tx.txid, txid, 'Returns transaction with matching txid')
+    t.equal(tx?.txid, txid, 'Returns transaction with matching txid')
 
     const status = await client.get_tx_status(txid)
     t.ok(status, 'Returns status')
-    t.equal(status.confirmed, true, 'Transaction is confirmed')
+    t.equal(status?.confirmed, true, 'Transaction is confirmed')
 
     t.end()
   })

@@ -1,3 +1,3 @@
-import { CoreClient } from '../index.js'
+import type { CoreClient } from '@/index.js'
 
-export type RunMethod = (client : CoreClient) => void | Promise<void>
+export type RunMethod = (client: CoreClient) => void | Promise<void>
